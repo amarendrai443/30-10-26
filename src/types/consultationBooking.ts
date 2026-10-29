@@ -44,6 +44,14 @@ export interface ConsultationSession {
   whatsappDispatched?: boolean;
   deepLinkUrl?: string;
   webVideoUrl?: string;
+  scheduledToken?: string;
+  claimWithInsurance?: boolean;
+  insuranceDetails?: {
+    company: string;
+    policyNumber: string;
+    claimStatus: 'approved' | 'in_review';
+    cashlessApproved: boolean;
+  };
   prescription?: {
     medicines: PrescriptionItem[];
     labTests: string[];

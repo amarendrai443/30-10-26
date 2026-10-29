@@ -255,6 +255,19 @@ export const MyBookingsModal: React.FC<MyBookingsModalProps> = ({
                       </div>
                     )}
 
+                    {/* Multi-Day Token Engine Indicator */}
+                    {b.multiDayTokens && b.multiDayTokens.length > 1 && (
+                      <div className="flex items-center justify-between px-2.5 py-1 rounded-lg bg-gradient-to-r from-teal-50 to-blue-50 border border-teal-200 text-[11px] font-semibold text-teal-950">
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-[#008080] shrink-0" />
+                          <span>{b.multiDayTokens.length}-Day Home Visit Package (Automated Midnight Token Rollover)</span>
+                        </div>
+                        <span className="text-[10px] bg-teal-200 text-teal-900 font-bold px-1.5 py-0.5 rounded">
+                          1-Day Validity/Token
+                        </span>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-600">
                       <div className="flex items-center gap-1.5">
                         <User className="w-3.5 h-3.5 text-slate-400" />

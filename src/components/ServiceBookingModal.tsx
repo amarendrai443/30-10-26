@@ -12,6 +12,9 @@ import {
   CheckCircle2,
   ChevronDown,
   Sparkles,
+  UploadCloud,
+  Trash2,
+  Plus,
 } from 'lucide-react';
 import { ServiceItem, BookingFormData } from '../types/serviceBooking';
 import { INDIAN_STATES, TIME_SLOTS } from '../data/servicesData';
@@ -70,6 +73,16 @@ export const ServiceBookingModal: React.FC<ServiceBookingModalProps> = ({
   const [paymentOption, setPaymentOption] = useState<InsurancePaymentOption>('pay_now');
   const [insuranceClaim, setInsuranceClaim] = useState<InsuranceClaimDetails | null>(null);
 
+  const isDoctorHomeVisit =
+    service?.id === 'doctor-home-visits' ||
+    service?.name?.toLowerCase().includes('doctor home visit') ||
+    service?.name?.toLowerCase().includes('doctor visit');
+
+  const [durationDays, setDurationDays] = useState<number>(1);
+  const [uploadedMedicalDocs, setUploadedMedicalDocs] = useState<
+    Array<{ name: string; size: string; type: string }>
+  >([]);
+
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -114,6 +127,37 @@ export const ServiceBookingModal: React.FC<ServiceBookingModalProps> = ({
       sameAsPhone: checked,
       whatsapp: checked ? prev.phone : prev.whatsapp,
     }));
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const newItems: Array<{ name: string; size: string; type: string }> = [];
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      const sizeStr = (f.size / (1024 * 1024)).toFixed(2) + ' MB';
+      newItems.push({
+        name: f.name,
+        size: sizeStr,
+        type: f.type || 'application/pdf',
+      });
+    }
+    setUploadedMedicalDocs((prev) => [...prev, ...newItems]);
+    if (errors.medicalDocs) setErrors((prev) => ({ ...prev, medicalDocs: '' }));
+  };
+
+  const handleAddSampleDoc = (docType: 'Discharge Summary' | 'Prescription') => {
+    const sample = {
+      name: `${docType}_${formData.patientName.replace(/\s+/g, '_') || 'Patient'}_Nhealth.pdf`,
+      size: '1.42 MB',
+      type: 'application/pdf',
+    };
+    setUploadedMedicalDocs((prev) => [...prev, sample]);
+    if (errors.medicalDocs) setErrors((prev) => ({ ...prev, medicalDocs: '' }));
+  };
+
+  const handleRemoveDoc = (index: number) => {
+    setUploadedMedicalDocs((prev) => prev.filter((_, idx) => idx !== index));
   };
 
   const validate = () => {
@@ -168,6 +212,11 @@ export const ServiceBookingModal: React.FC<ServiceBookingModalProps> = ({
       newErrors.insurance = 'Please complete the insurance OTP verification above to confirm cashless claim.';
     }
 
+    if (isDoctorHomeVisit && paymentOption === 'claim_insurance' && uploadedMedicalDocs.length === 0) {
+      newErrors.medicalDocs =
+        'Please upload required medical documents (Discharge Summary or Prescription) for cashless doctor home visit insurance claim.';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -178,6 +227,8 @@ export const ServiceBookingModal: React.FC<ServiceBookingModalProps> = ({
       onSubmitBooking({
         ...formData,
         insuranceClaim: paymentOption === 'claim_insurance' ? (insuranceClaim || undefined) : undefined,
+        durationDays: isDoctorHomeVisit ? durationDays : 1,
+        uploadedMedicalDocs: uploadedMedicalDocs.length > 0 ? uploadedMedicalDocs : undefined,
       });
     }
   };
@@ -500,13 +551,64 @@ export const ServiceBookingModal: React.FC<ServiceBookingModalProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* DURATION INPUT FOR DOCTOR HOME VISITS */}
+            {isDoctorHomeVisit && (
+              <div className="mt-3.5 p-3.5 rounded-2xl bg-teal-50/70 border border-teal-200 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black uppercase tracking-wider text-teal-900 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-[#008080]" />
+                    <span>Doctor Home Visit Duration (Days) *</span>
+                  </label>
+                  <span className="text-[10px] font-bold text-teal-800 bg-teal-200/80 px-2 py-0.5 rounded-full">
+                    Automated Midnight Rollover Engine
+                  </span>
+                </div>
+                <p className="text-[11px] text-teal-800 leading-relaxed">
+                  Specify the number of days you require clinician home visits. For multi-day packages, Nhealth automatically generates a fresh QR token every day right after midnight (12:00 AM) with strict 1-day calendar validity.
+                </p>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {[1, 3, 5, 7, 14].map((d) => (
+                    <button
+                      key={`dur-${d}`}
+                      type="button"
+                      onClick={() => setDurationDays(d)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        durationDays === d
+                          ? 'bg-[#002b49] text-white shadow-xs ring-2 ring-teal-500/30'
+                          : 'bg-white text-slate-700 border border-slate-200 hover:bg-teal-50'
+                      }`}
+                    >
+                      {d === 1 ? '1 Day (Single Visit)' : `${d} Days Package`}
+                    </button>
+                  ))}
+                  <div className="flex items-center gap-1.5 ml-auto text-xs font-bold text-slate-700">
+                    <span>Custom:</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="30"
+                      value={durationDays}
+                      onChange={(e) => setDurationDays(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                      className="w-16 px-2 py-1 rounded-lg border border-slate-300 bg-white text-xs font-bold text-center focus:outline-none focus:ring-2 focus:ring-[#008080]"
+                    />
+                    <span className="text-[11px] text-slate-500">Days</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Section 6: Payment & Cashless Insurance Claim Options */}
-          <div className="pt-2 border-t border-slate-200/80">
+          <div className="pt-2 border-t border-slate-200/80 space-y-3">
             <InsuranceClaimSection
-              amount={1250}
-              serviceOrProductName={service.name}
+              amount={1250 * (isDoctorHomeVisit ? durationDays : 1)}
+              serviceOrProductName={
+                isDoctorHomeVisit && durationDays > 1
+                  ? `${service.name} (${durationDays} Days Package)`
+                  : service.name
+              }
               defaultPhone={formData.phone}
               defaultName={formData.patientName}
               selectedOption={paymentOption}
@@ -515,6 +617,7 @@ export const ServiceBookingModal: React.FC<ServiceBookingModalProps> = ({
               onChangeOption={(opt) => {
                 setPaymentOption(opt);
                 if (errors.insurance) setErrors((prev) => ({ ...prev, insurance: '' }));
+                if (errors.medicalDocs) setErrors((prev) => ({ ...prev, medicalDocs: '' }));
               }}
               onClaimConfirmed={(claim) => {
                 setInsuranceClaim(claim);
@@ -526,6 +629,92 @@ export const ServiceBookingModal: React.FC<ServiceBookingModalProps> = ({
                 <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
                 <span>{errors.insurance}</span>
               </p>
+            )}
+
+            {/* MANDATORY MEDICAL DOCUMENTS UPLOAD FOR DOCTOR HOME VISITS INSURANCE CLAIM */}
+            {isDoctorHomeVisit && paymentOption === 'claim_insurance' && (
+              <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-300/80 text-left space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-amber-700" />
+                    <span className="text-xs font-black uppercase tracking-wider text-amber-950">
+                      Upload Medical Documents (Discharge Summary / Prescriptions) *
+                    </span>
+                  </div>
+                  <span className="text-[10px] bg-amber-200 text-amber-900 font-bold px-2 py-0.5 rounded-full">
+                    Required for Cashless Approval
+                  </span>
+                </div>
+                <p className="text-[11px] text-amber-900 leading-relaxed">
+                  As mandated by TPA/Insurer guidelines for doctor home visits, please attach the patient's recent Hospital Discharge Summary, treating physician referral, or valid prescription.
+                </p>
+
+                {/* Upload Buttons */}
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <label className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-amber-300 text-amber-950 hover:bg-amber-100 font-bold text-xs cursor-pointer shadow-2xs transition-colors">
+                    <UploadCloud className="w-4 h-4 text-amber-700" />
+                    <span>Upload PDF / Images</span>
+                    <input
+                      type="file"
+                      multiple
+                      accept=".pdf,.png,.jpg,.jpeg"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={() => handleAddSampleDoc('Discharge Summary')}
+                    className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-xs border border-amber-300/60 cursor-pointer transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ Attach Sample Discharge Summary</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleAddSampleDoc('Prescription')}
+                    className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-xs border border-amber-300/60 cursor-pointer transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ Attach Sample Prescription</span>
+                  </button>
+                </div>
+
+                {/* Uploaded Documents List */}
+                {uploadedMedicalDocs.length > 0 && (
+                  <div className="space-y-1.5 pt-1">
+                    {uploadedMedicalDocs.map((doc, idx) => (
+                      <div
+                        key={`doc-${idx}`}
+                        className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-amber-200 text-xs shadow-2xs"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span className="font-bold text-slate-800 truncate">{doc.name}</span>
+                          <span className="text-[10px] text-slate-400 shrink-0">({doc.size})</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveDoc(idx)}
+                          className="text-red-500 hover:text-red-700 p-1 rounded-lg hover:bg-red-50 transition-colors ml-2 cursor-pointer shrink-0"
+                          title="Remove document"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {errors.medicalDocs && (
+                  <p className="text-[11px] font-bold text-red-600 flex items-center gap-1 mt-1">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{errors.medicalDocs}</span>
+                  </p>
+                )}
+              </div>
             )}
           </div>
 

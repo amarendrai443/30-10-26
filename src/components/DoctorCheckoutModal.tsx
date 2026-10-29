@@ -101,8 +101,17 @@ export const DoctorCheckoutModal: React.FC<DoctorCheckoutModalProps> = ({
     'Coupon NHEALTHLIVE applied: Flat ₹150 OFF'
   );
 
-  // Payment Method
-  const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'Card' | 'NetBanking'>('UPI');
+  // Payment Method & Insurance Option
+  const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'Card' | 'NetBanking' | 'Insurance'>('UPI');
+  const [insuranceCompany, setInsuranceCompany] = useState('Star Health & Allied Insurance');
+  const [policyNumber, setPolicyNumber] = useState('SH-POL-84920');
+  const [insuranceVerified, setInsuranceVerified] = useState(true);
+
+  // Scheduled Consultation Token Verification Modal
+  const [tokenVerificationModalOpen, setTokenVerificationModalOpen] = useState(false);
+  const [tokenInput, setTokenInput] = useState('');
+  const [tokenError, setTokenError] = useState<string | null>(null);
+  const [pendingTargetRole, setPendingTargetRole] = useState<'patient' | 'doctor'>('doctor');
 
   // Session & Vitals Payload
   const [activeSession, setActiveSession] = useState<ConsultationSession | null>(null);
@@ -127,7 +136,9 @@ export const DoctorCheckoutModal: React.FC<DoctorCheckoutModalProps> = ({
   // Price Calculation
   const originalFee = doctor.consultationFee || 600;
   let discountAmount = 0;
-  if (appliedCoupon && AVAILABLE_COUPONS[appliedCoupon]) {
+  if (paymentMethod === 'Insurance') {
+    discountAmount = originalFee;
+  } else if (appliedCoupon && AVAILABLE_COUPONS[appliedCoupon]) {
     const cp = AVAILABLE_COUPONS[appliedCoupon];
     if (cp.type === 'flat') {
       discountAmount = cp.value;
@@ -135,7 +146,7 @@ export const DoctorCheckoutModal: React.FC<DoctorCheckoutModalProps> = ({
       discountAmount = Math.min(Math.round((originalFee * cp.value) / 100), 300);
     }
   }
-  const finalAmount = Math.max(originalFee - discountAmount, 0);
+  const finalAmount = paymentMethod === 'Insurance' ? 0 : Math.max(originalFee - discountAmount, 0);
 
   // Apply Coupon Handler
   const handleApplyCoupon = (e?: React.FormEvent) => {
@@ -191,6 +202,14 @@ export const DoctorCheckoutModal: React.FC<DoctorCheckoutModalProps> = ({
     }
     setStep('processing');
 
+    // Immediate vs. Scheduled Token Generation Rule:
+    // Immediate Consultations: Do NOT generate any token; route straight to instant queue matching.
+    // Scheduled Consultations: Automatically generate a unique token number upon booking.
+    const scheduledToken =
+      connectMode === 'Scheduled Slot'
+        ? `NHT-DOC-${Math.floor(100000 + Math.random() * 900000)}`
+        : undefined;
+
     // Create session object
     const session: ConsultationSession = {
       sessionId: `SES-${Math.floor(100000 + Math.random() * 900000)}`,
@@ -199,6 +218,17 @@ export const DoctorCheckoutModal: React.FC<DoctorCheckoutModalProps> = ({
       mode: connectMode,
       scheduledDate: connectMode === 'Scheduled Slot' ? selectedDate : undefined,
       scheduledSlot: connectMode === 'Scheduled Slot' ? selectedSlot : undefined,
+      scheduledToken,
+      claimWithInsurance: paymentMethod === 'Insurance',
+      insuranceDetails:
+        paymentMethod === 'Insurance'
+          ? {
+              company: insuranceCompany,
+              policyNumber,
+              claimStatus: 'approved',
+              cashlessApproved: true,
+            }
+          : undefined,
       patientName,
       patientPhone,
       patientAge,
@@ -220,10 +250,10 @@ export const DoctorCheckoutModal: React.FC<DoctorCheckoutModalProps> = ({
     // Simulate Payment Gateway Authorization (1.2 seconds)
     setTimeout(() => {
       if (connectMode === 'Immediate Connect') {
-        // Trigger automated Vital Lens pre-call scan prompt
+        // Trigger automated Vital Lens pre-call scan prompt, then straight to instant queue matching
         setStep('vitals_prompt');
       } else {
-        // For scheduled slot, go straight to confirmed waiting/schedule room
+        // For scheduled slot, go straight to confirmed waiting/schedule room with mandatory token
         finalizeAndEnterWaitingRoom(session, null);
       }
     }, 1200);
@@ -735,31 +765,133 @@ export const DoctorCheckoutModal: React.FC<DoctorCheckoutModalProps> = ({
               )}
             </div>
 
-            {/* Payment Method Selection */}
-            <div className="space-y-2">
-              <label className="text-xs font-black uppercase tracking-wider text-slate-700 block">
-                Payment Method (Instant Gateway)
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { id: 'UPI', label: 'UPI / QR', desc: 'GPay, PhonePe, Paytm' },
-                  { id: 'Card', label: 'Credit / Debit', desc: 'Visa, Master, RuPay' },
-                  { id: 'NetBanking', label: 'NetBanking', desc: 'All Major Banks' },
-                ].map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => setPaymentMethod(m.id as any)}
-                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                      paymentMethod === m.id
-                        ? 'border-[#008080] bg-teal-50/60 ring-2 ring-teal-500/20'
-                        : 'border-slate-200 bg-white hover:bg-slate-50'
+            {/* PAYMENT OPTIONS: CLAIM WITH INSURANCE OR DIRECT GATEWAY */}
+            <div className="space-y-3">
+              {/* Option Selector Toggle: Insurance vs Self-Pay Gateway */}
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black uppercase tracking-wider text-slate-700 block">
+                  Select Payment Option
+                </label>
+                <span className="text-[10px] text-teal-800 font-bold bg-teal-100 px-2 py-0.5 rounded-full">
+                  Cashless TPA Teleconsultations Supported
+                </span>
+              </div>
+
+              {/* CLAIM WITH INSURANCE HERO OPTION */}
+              <div
+                onClick={() => setPaymentMethod('Insurance')}
+                className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                  paymentMethod === 'Insurance'
+                    ? 'border-[#008080] bg-teal-50/80 ring-2 ring-teal-500/25 shadow-xs'
+                    : 'border-slate-200 bg-white hover:border-teal-300'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                        paymentMethod === 'Insurance'
+                          ? 'bg-[#008080] text-white shadow-xs'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      <ShieldCheck className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-black text-[#002b49] flex items-center gap-1.5">
+                        <span>Claim with Insurance</span>
+                        <span className="text-[9.5px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">
+                          100% Cashless (₹0 Copay)
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-500">
+                        Covered under OPD / Teleconsultation health insurance policy
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                      paymentMethod === 'Insurance'
+                        ? 'border-[#008080] bg-[#008080] text-white'
+                        : 'border-slate-300 bg-white'
                     }`}
                   >
-                    <div className="text-xs font-bold text-[#002b49]">{m.label}</div>
-                    <div className="text-[10px] text-slate-500 truncate">{m.desc}</div>
-                  </button>
-                ))}
+                    {paymentMethod === 'Insurance' && <div className="w-2 h-2 rounded-full bg-white" />}
+                  </div>
+                </div>
+
+                {/* Sub-form if Insurance is selected */}
+                {paymentMethod === 'Insurance' && (
+                  <div className="mt-3 pt-3 border-t border-teal-200/80 space-y-2.5 text-left">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Insurance Company
+                        </label>
+                        <select
+                          value={insuranceCompany}
+                          onChange={(e) => setInsuranceCompany(e.target.value)}
+                          className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-slate-300 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#008080]"
+                        >
+                          <option value="Star Health & Allied Insurance">Star Health &amp; Allied Insurance</option>
+                          <option value="HDFC ERGO Health Insurance">HDFC ERGO Health Insurance</option>
+                          <option value="Care Health Insurance">Care Health Insurance</option>
+                          <option value="ICICI Lombard General Insurance">ICICI Lombard General Insurance</option>
+                          <option value="Niva Bupa Health Insurance">Niva Bupa Health Insurance</option>
+                          <option value="Reliance General Insurance">Reliance General Insurance</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Policy / Member Number
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={policyNumber}
+                          onChange={(e) => setPolicyNumber(e.target.value.toUpperCase())}
+                          placeholder="e.g. SH-POL-9921448"
+                          className="w-full text-xs font-bold px-3 py-2 rounded-xl border border-slate-300 bg-white uppercase text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#008080]"
+                        />
+                      </div>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1.5 text-emerald-800 font-bold">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>Pre-authorized for Dr. {doctor.name} ({doctor.specialization})</span>
+                      </div>
+                      <span className="font-black text-emerald-900 font-mono">Approved ₹{originalFee}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* PAYMENT GATEWAY SELECTION (UPI / Card / NetBanking) */}
+              <div className="pt-1">
+                <div className="text-[11px] font-bold text-slate-600 mb-1.5">
+                  Or Pay via Payment Gateway:
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: 'UPI', label: 'UPI / QR', desc: 'GPay, PhonePe, Paytm' },
+                    { id: 'Card', label: 'Credit / Debit', desc: 'Visa, Master, RuPay' },
+                    { id: 'NetBanking', label: 'NetBanking', desc: 'All Major Banks' },
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setPaymentMethod(m.id as any)}
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        paymentMethod === m.id
+                          ? 'border-[#008080] bg-teal-50/60 ring-2 ring-teal-500/20'
+                          : 'border-slate-200 bg-white hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="text-xs font-bold text-[#002b49]">{m.label}</div>
+                      <div className="text-[10px] text-slate-500 truncate">{m.desc}</div>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -769,11 +901,18 @@ export const DoctorCheckoutModal: React.FC<DoctorCheckoutModalProps> = ({
                 <span>Doctor Consultation Fee</span>
                 <span className="font-semibold text-slate-900">₹{originalFee}</span>
               </div>
-              {discountAmount > 0 && (
+              {paymentMethod === 'Insurance' ? (
                 <div className="flex items-center justify-between text-xs text-emerald-700 font-bold">
-                  <span>Coupon Discount ({appliedCoupon})</span>
-                  <span>-₹{discountAmount}</span>
+                  <span>Cashless Insurance Claim ({insuranceCompany})</span>
+                  <span>-₹{originalFee} (100% Covered)</span>
                 </div>
+              ) : (
+                discountAmount > 0 && (
+                  <div className="flex items-center justify-between text-xs text-emerald-700 font-bold">
+                    <span>Coupon Discount ({appliedCoupon})</span>
+                    <span>-₹{discountAmount}</span>
+                  </div>
+                )
               )}
               <div className="flex items-center justify-between text-xs text-slate-600">
                 <span>Nhealth Platform &amp; Encryption Fee</span>
@@ -792,7 +931,11 @@ export const DoctorCheckoutModal: React.FC<DoctorCheckoutModalProps> = ({
             >
               <CreditCard className="w-5 h-5" />
               <span>
-                {connectMode === 'Immediate Connect'
+                {paymentMethod === 'Insurance'
+                  ? connectMode === 'Immediate Connect'
+                    ? 'Confirm Cashless (₹0) & Connect Immediately'
+                    : 'Confirm Cashless (₹0) & Schedule Slot'
+                  : connectMode === 'Immediate Connect'
                   ? `Pay ₹${finalAmount} & Connect Immediately`
                   : `Pay ₹${finalAmount} & Confirm Appointment`}
               </span>
@@ -1002,8 +1145,15 @@ export const DoctorCheckoutModal: React.FC<DoctorCheckoutModalProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      setVideoRoomRole('doctor');
-                      setIsVideoRoomOpen(true);
+                      if (activeSession?.mode === 'Scheduled Slot') {
+                        setPendingTargetRole('doctor');
+                        setTokenInput('');
+                        setTokenError(null);
+                        setTokenVerificationModalOpen(true);
+                      } else {
+                        setVideoRoomRole('doctor');
+                        setIsVideoRoomOpen(true);
+                      }
                     }}
                     className="px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-500 hover:to-teal-500 text-slate-950 font-black text-xs shadow-lg active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                   >
@@ -1014,8 +1164,15 @@ export const DoctorCheckoutModal: React.FC<DoctorCheckoutModalProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      setVideoRoomRole('patient');
-                      setIsVideoRoomOpen(true);
+                      if (activeSession?.mode === 'Scheduled Slot') {
+                        setPendingTargetRole('patient');
+                        setTokenInput('');
+                        setTokenError(null);
+                        setTokenVerificationModalOpen(true);
+                      } else {
+                        setVideoRoomRole('patient');
+                        setIsVideoRoomOpen(true);
+                      }
                     }}
                     className="px-3 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer border border-white/20 transition-all"
                   >
@@ -1030,6 +1187,59 @@ export const DoctorCheckoutModal: React.FC<DoctorCheckoutModalProps> = ({
                 </div>
               )}
             </div>
+
+            {/* IMMEDIATE VS. SCHEDULED CONSULTATION TOKEN ENGINE STATUS */}
+            {activeSession?.mode === 'Immediate Connect' ? (
+              <div className="p-3.5 rounded-2xl bg-teal-50 border border-teal-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-left shadow-2xs">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-[#008080] text-white flex items-center justify-center shrink-0">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-black text-[#002b49] flex items-center gap-1.5">
+                      <span>Instant Priority Queue Matching</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">
+                        Direct Queue
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-teal-800">
+                      Immediate Consultation: No token generated. Direct instant video room connect enabled.
+                    </div>
+                  </div>
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-wider bg-white px-2.5 py-1 rounded-lg border border-teal-200 text-teal-900 self-start sm:self-auto">
+                  Instant Access
+                </span>
+              </div>
+            ) : (
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 text-left space-y-2.5 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-5 h-5 text-amber-700 shrink-0" />
+                    <span className="text-xs font-black uppercase tracking-wider text-amber-950">
+                      Scheduled Consultation Token (Mandatory)
+                    </span>
+                  </div>
+                  <span className="text-[10px] bg-amber-200 text-amber-900 font-black px-2.5 py-0.5 rounded-full uppercase">
+                    Required to Launch Call
+                  </span>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-white p-3 rounded-xl border border-amber-300">
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Token Number</span>
+                    <span className="text-base sm:text-lg font-black font-mono tracking-wider text-[#002b49]">
+                      {activeSession?.scheduledToken}
+                    </span>
+                  </div>
+                  <div className="text-xs text-amber-900 font-semibold">
+                    Slot: <strong>{activeSession?.scheduledDate}</strong> ({activeSession?.scheduledSlot})
+                  </div>
+                </div>
+                <p className="text-[11px] text-amber-900 leading-relaxed">
+                  Scheduled Consultation Security: This unique token number was automatically generated upon booking. It is <strong>mandatory to authenticate and start</strong> your scheduled video session.
+                </p>
+              </div>
+            )}
 
             {/* WHATSAPP RECEIPT DISPATCH & DEEP LINK CONFIRMATION CARD */}
             {whatsappReceipt && (
@@ -1170,6 +1380,113 @@ export const DoctorCheckoutModal: React.FC<DoctorCheckoutModalProps> = ({
           </div>
         )}
       </div>
+
+      {/* ============================================================== */}
+      {/* 4.5. MANDATORY TOKEN VERIFICATION MODAL FOR SCHEDULED CONSULTATION */}
+      {/* ============================================================== */}
+      {tokenVerificationModalOpen && activeSession && (
+        <div className="fixed inset-0 z-[12000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 text-left shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 flex items-center justify-center">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-[#002b49]">Authenticate Scheduled Session</h4>
+                  <p className="text-[10px] text-slate-500">Mandatory Token Verification</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTokenVerificationModalOpen(false)}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Please enter the unique token generated upon booking to start your scheduled consultation with <strong>Dr. {doctor.name}</strong>.
+            </p>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const clean = tokenInput.trim().toUpperCase();
+                if (!clean) {
+                  setTokenError('Please enter your scheduled consultation token.');
+                  return;
+                }
+                if (clean !== activeSession.scheduledToken?.toUpperCase()) {
+                  setTokenError('Invalid token. Please enter the exact scheduled token from your booking receipt.');
+                  return;
+                }
+                setTokenVerificationModalOpen(false);
+                setVideoRoomRole(pendingTargetRole);
+                setIsVideoRoomOpen(true);
+              }}
+              className="space-y-3"
+            >
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Consultation Token <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. NHT-DOC-123456"
+                  value={tokenInput}
+                  onChange={(e) => {
+                    setTokenInput(e.target.value.toUpperCase());
+                    if (tokenError) setTokenError(null);
+                  }}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-mono text-sm uppercase text-[#002b49] font-black tracking-wider focus:outline-none focus:ring-2 focus:ring-[#008080]"
+                />
+              </div>
+
+              {activeSession.scheduledToken && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTokenInput(activeSession.scheduledToken || '');
+                    if (tokenError) setTokenError(null);
+                  }}
+                  className="text-[11px] font-bold text-[#008080] hover:underline flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>Autofill generated token:</span>
+                  <span className="font-mono bg-teal-50 px-2 py-0.5 rounded border border-teal-200 text-[#002b49] font-black">
+                    {activeSession.scheduledToken}
+                  </span>
+                </button>
+              )}
+
+              {tokenError && (
+                <p className="text-xs text-red-600 font-bold flex items-center gap-1">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{tokenError}</span>
+                </p>
+              )}
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setTokenVerificationModalOpen(false)}
+                  className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#008080] to-[#005555] hover:from-[#006666] hover:to-[#004444] text-white text-xs font-black shadow-md cursor-pointer transition-all"
+                >
+                  Verify &amp; Launch Call
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ============================================================== */}
       {/* 5. DOCTOR & PATIENT END-TO-END ENCRYPTED VIDEO CONSULTATION ROOM */}

@@ -39,6 +39,7 @@ import {
   ScanLine,
   QrCode,
   Webhook,
+  BarChart3,
 } from 'lucide-react';
 import { UserAccount, ConfirmedBooking } from '../types/serviceBooking';
 import { DashboardRole, LinkedAccount } from '../types/dashboard';
@@ -50,6 +51,7 @@ import {
 import { AuthorizedPharmacyScannerModal } from './AuthorizedPharmacyScannerModal';
 import { TokenDepartment } from '../types/secureToken';
 import { PartnerApiWebhookSettings } from './PartnerApiWebhookSettings';
+import { PartnerFinancialLedgerSection } from './PartnerFinancialLedgerSection';
 
 interface RoleBasedDashboardProps {
   currentUser: UserAccount;
@@ -89,7 +91,7 @@ export const RoleBasedDashboard: React.FC<RoleBasedDashboardProps> = ({
   const [roleSwitcherOpen, setRoleSwitcherOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
-  const [partnerSubTab, setPartnerSubTab] = useState<'overview' | 'api_webhooks'>('overview');
+  const [partnerSubTab, setPartnerSubTab] = useState<'overview' | 'financial_ledger' | 'api_webhooks'>('overview');
 
   const getRoleDepartment = (role: DashboardRole): TokenDepartment => {
     switch (role) {
@@ -473,7 +475,7 @@ export const RoleBasedDashboard: React.FC<RoleBasedDashboardProps> = ({
           </div>
         </div>
 
-        {/* Partner Sub-Navigation Bar: Operational Console vs API & Webhook Settings */}
+        {/* Partner Sub-Navigation Bar: Operational Console vs Financial Ledger vs API & Webhook Settings */}
         {activeRole !== 'Patient' && (
           <div className="bg-white rounded-2xl p-1.5 border border-slate-200/90 shadow-2xs flex flex-wrap items-center gap-1.5">
             <button
@@ -487,6 +489,24 @@ export const RoleBasedDashboard: React.FC<RoleBasedDashboardProps> = ({
             >
               <Activity className="w-3.5 h-3.5 text-teal-400" />
               <span>{activeRole} Operational Console</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setPartnerSubTab('financial_ledger')}
+              className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
+                partnerSubTab === 'financial_ledger'
+                  ? 'bg-[#002b49] text-white shadow-2xs'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-[#002b49]'
+              }`}
+            >
+              <BarChart3 className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Financial Ledger &amp; QR Analytics</span>
+              <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
+                partnerSubTab === 'financial_ledger' ? 'bg-emerald-500/30 text-emerald-200' : 'bg-emerald-50 text-emerald-700'
+              }`}>
+                Live Settlements
+              </span>
             </button>
 
             <button
@@ -524,6 +544,12 @@ export const RoleBasedDashboard: React.FC<RoleBasedDashboardProps> = ({
             partnerName={currentUser.entityName || currentUser.name || `${activeRole} Partner Unit`}
             partnerId={currentUser.id}
             onToast={showToast}
+          />
+        ) : activeRole !== 'Patient' && partnerSubTab === 'financial_ledger' ? (
+          <PartnerFinancialLedgerSection
+            role={activeRole}
+            partnerName={currentUser.entityName || currentUser.name || `${activeRole} Partner Unit`}
+            partnerId={currentUser.id}
           />
         ) : (
           <>
@@ -1632,6 +1658,33 @@ export const RoleBasedDashboard: React.FC<RoleBasedDashboardProps> = ({
             </div>
           </div>
         )}
+
+            {/* Embedded Financial & Operational Reporting Section for all Partner Dashboards */}
+            {activeRole !== 'Patient' && partnerSubTab === 'overview' && (
+              <div className="pt-8 border-t border-slate-200/80">
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5 text-emerald-600" />
+                    <h3 className="font-extrabold text-lg text-[#002b49]">
+                      {activeRole} Financial Ledger &amp; QR Redemption Audit
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPartnerSubTab('financial_ledger')}
+                    className="text-xs font-bold text-[#008080] hover:text-[#006666] flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>Expand Dedicated Ledger View</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <PartnerFinancialLedgerSection
+                  role={activeRole}
+                  partnerName={currentUser.entityName || currentUser.name || `${activeRole} Partner Unit`}
+                  partnerId={currentUser.id}
+                />
+              </div>
+            )}
           </>
         )}
 

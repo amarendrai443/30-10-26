@@ -942,6 +942,13 @@ export const HrPortalPage: React.FC<HrPortalPageProps> = ({ onNavigateHome, onNa
               </button>
             </div>
 
+            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-700/80 flex items-start gap-3 text-xs text-slate-300">
+              <Lock className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <strong className="text-white">Admin-Exclusive Credentials Management:</strong> Viewing, editing, assigning permissions, and toggling active system login credentials is strictly restricted to the main <strong>Master Administrator</strong> in the Command Center. HR personnel can draft and track pending submissions here.
+              </div>
+            </div>
+
             {/* Table of Credential Requests */}
             <div className="bg-slate-800/60 border border-slate-700/70 rounded-2xl overflow-hidden shadow-xl">
               <div className="overflow-x-auto">
@@ -951,57 +958,66 @@ export const HrPortalPage: React.FC<HrPortalPageProps> = ({ onNavigateHome, onNa
                       <th className="px-4 py-3.5">Candidate Name &amp; Email</th>
                       <th className="px-4 py-3.5">Requested Role &amp; Dept</th>
                       <th className="px-4 py-3.5">Submitted By</th>
-                      <th className="px-4 py-3.5 text-center">Governance Status</th>
+                      <th className="px-4 py-3.5 text-center">Admin Approval Status</th>
                       <th className="px-4 py-3.5">Admin Review Notes</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/60">
-                    {staffAccounts.map((acc) => {
-                      const isPending = acc.approvalStatus === 'PendingApproval';
-                      const isRejected = acc.approvalStatus === 'Rejected';
-                      const isApproved = acc.approvalStatus === 'Approved' || (!acc.approvalStatus && acc.loginEnabled);
+                    {staffAccounts
+                      .filter((acc) => acc.approvalStatus === 'PendingApproval' || acc.requestedBy?.toLowerCase().includes('hr'))
+                      .map((acc) => {
+                        const isPending = acc.approvalStatus === 'PendingApproval';
+                        const isRejected = acc.approvalStatus === 'Rejected';
+                        const isApproved = acc.approvalStatus === 'Approved';
 
-                      return (
-                        <tr key={acc.id} className="hover:bg-slate-800/40 transition-colors">
-                          <td className="px-4 py-3.5">
-                            <div className="font-semibold text-white">{acc.name}</div>
-                            <div className="text-[11px] text-slate-400">{acc.email}</div>
-                            <div className="text-[10px] text-slate-500">{acc.phone}</div>
-                          </td>
-                          <td className="px-4 py-3.5">
-                            <div className="text-slate-200 font-medium">{acc.role}</div>
-                            <div className="text-[11px] text-teal-400">{acc.department}</div>
-                          </td>
-                          <td className="px-4 py-3.5 text-slate-300">
-                            <div>{acc.requestedBy || 'System Administrator'}</div>
-                            <div className="text-[10px] text-slate-500">{acc.requestedAt || acc.createdAt}</div>
-                          </td>
-                          <td className="px-4 py-3.5 text-center">
-                            {isPending && (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-950/80 text-amber-300 border border-amber-500/40 text-[10px] font-bold">
-                                <Clock className="w-3 h-3 text-amber-400" />
-                                Queued for Admin Review
-                              </span>
-                            )}
-                            {isApproved && (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold">
-                                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                                Approved &amp; {acc.loginEnabled ? 'Login Enabled' : 'Access Paused'}
-                              </span>
-                            )}
-                            {isRejected && (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-950/80 text-red-300 border border-red-500/40 text-[10px] font-bold">
-                                <XCircle className="w-3 h-3 text-red-400" />
-                                Rejected by Admin
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3.5 text-slate-400 text-[11px] max-w-xs">
-                            {acc.adminNotes || acc.notes || (isApproved ? 'Standard access granted' : 'Pending verification')}
-                          </td>
-                        </tr>
-                      );
-                    })}
+                        return (
+                          <tr key={acc.id} className="hover:bg-slate-800/40 transition-colors">
+                            <td className="px-4 py-3.5">
+                              <div className="font-semibold text-white">{acc.name}</div>
+                              <div className="text-[11px] text-slate-400">{acc.email}</div>
+                              <div className="text-[10px] text-slate-500">{acc.phone}</div>
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <div className="text-slate-200 font-medium">{acc.role}</div>
+                              <div className="text-[11px] text-teal-400">{acc.department}</div>
+                            </td>
+                            <td className="px-4 py-3.5 text-slate-300">
+                              <div>{acc.requestedBy || 'HR Department'}</div>
+                              <div className="text-[10px] text-slate-500">{acc.requestedAt || acc.createdAt}</div>
+                            </td>
+                            <td className="px-4 py-3.5 text-center">
+                              {isPending && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-950/80 text-amber-300 border border-amber-500/40 text-[10px] font-bold">
+                                  <Clock className="w-3 h-3 text-amber-400" />
+                                  Queued for Admin Review
+                                </span>
+                              )}
+                              {isApproved && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                  Approved by Admin
+                                </span>
+                              )}
+                              {isRejected && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-950/80 text-red-300 border border-red-500/40 text-[10px] font-bold">
+                                  <XCircle className="w-3 h-3 text-red-400" />
+                                  Rejected by Admin
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3.5 text-slate-400 text-[11px] max-w-xs">
+                              {acc.adminNotes || acc.notes || (isApproved ? 'Approved by Master Admin' : 'Awaiting review')}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    {staffAccounts.filter((acc) => acc.approvalStatus === 'PendingApproval' || acc.requestedBy?.toLowerCase().includes('hr')).length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-6 text-center text-slate-500 italic">
+                          No pending team credential requests submitted yet. Use &ldquo;Submit New Team Credential&rdquo; above.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>

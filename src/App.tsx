@@ -113,6 +113,7 @@ import {
   resolveDepartment,
   getDepartmentLabel,
 } from './utils/secureQrToken';
+import { generateMultiDayTokens } from './utils/multiDayTokenEngine';
 
 
 const NHEALTH_LOGO_URL = 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
@@ -523,11 +524,21 @@ export default function App() {
         destRoute = getRouteFromLocation();
       }
 
+      // If destRoute is known and differs from current view, take strictly 1 step back to that view
+      if (destRoute && destRoute !== currentRoute) {
+        setCurrentRoute(destRoute);
+        try {
+          localStorage.setItem('nhealth_active_route', destRoute);
+          sessionStorage.setItem('nhealth_active_route', destRoute);
+        } catch {}
+        return;
+      }
+
       const rootRoute: RoutePath = isLoggedIn
         ? (currentUser?.role === 'Patient' || currentUser?.accountType === 'Patient' ? 'patient-dashboard' : 'dashboard')
         : 'home';
 
-      // 4. Gradual Exit: If already at the root page and user presses Back again
+      // 4. Gradual Exit: Only if already settled on root page and user presses Back again
       if (currentRoute === rootRoute) {
         const allowExit = navHistory.handleRootBackPress();
         if (!allowExit) {
@@ -538,11 +549,11 @@ export default function App() {
         return;
       }
 
-      // 5. Navigate 1 step back to previously visited internal page
-      setCurrentRoute(destRoute);
+      // 5. Fallback 1-step back navigation to rootRoute
+      setCurrentRoute(rootRoute);
       try {
-        localStorage.setItem('nhealth_active_route', destRoute);
-        sessionStorage.setItem('nhealth_active_route', destRoute);
+        localStorage.setItem('nhealth_active_route', rootRoute);
+        sessionStorage.setItem('nhealth_active_route', rootRoute);
       } catch {}
     };
 
@@ -1338,6 +1349,16 @@ export default function App() {
       dept
     );
 
+    const isDoctorHomeVisit =
+      data.serviceId === 'doctor-home-visits' ||
+      data.serviceName.toLowerCase().includes('doctor home visit') ||
+      data.serviceName.toLowerCase().includes('doctor visit');
+    const durationDays = isDoctorHomeVisit && data.durationDays ? data.durationDays : 1;
+    const multiDayTokens =
+      isDoctorHomeVisit && durationDays > 1
+        ? generateMultiDayTokens(data.preferredDate, durationDays)
+        : undefined;
+
     const confirmed: ConfirmedBooking = {
       referenceId: generatedRef,
       serviceId: data.serviceId,
@@ -1361,6 +1382,9 @@ export default function App() {
       serviceCategory: categoryLabel,
       secureTokenId: token.tokenId,
       qrStatus: 'active',
+      durationDays,
+      uploadedMedicalDocs: data.uploadedMedicalDocs,
+      multiDayTokens,
     };
 
     if (!isGuest) {
@@ -2025,6 +2049,13 @@ export default function App() {
             >
               Corporate
             </a>
+            <button
+              type="button"
+              onClick={() => handleOpenQuickLink('medical-tourism')}
+              className="hover:text-[#008080] transition-colors py-1.5 px-1.5 xl:px-2 rounded-lg whitespace-nowrap shrink-0 cursor-pointer font-medium"
+            >
+              Medical Tourism
+            </button>
             <a
               href="#partners"
               onClick={(e) => {
@@ -2150,6 +2181,32 @@ export default function App() {
                 <span>Services (16 Unified Offerings)</span>
                 <span className="text-[10px] font-bold text-[#008080] bg-teal-50 px-2 py-0.5 rounded-full">All Available</span>
               </a>
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  navigateTo('doorstep-pharmacy', '/doorstep-pharmacy');
+                }}
+                className="w-full text-left text-sm font-semibold text-slate-800 hover:text-[#008080] py-1.5 cursor-pointer flex items-center justify-between"
+              >
+                <span>Doorstep Pharmacy</span>
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  Instant Delivery
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  navigateTo('online-consultation', '/online-consultation');
+                }}
+                className="w-full text-left text-sm font-semibold text-slate-800 hover:text-[#008080] py-1.5 cursor-pointer flex items-center justify-between"
+              >
+                <span>Online Doctor Consultation</span>
+                <span className="text-[10px] font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200">
+                  Video / Call
+                </span>
+              </button>
               <a
                 href="#how-it-works"
                 onClick={() => setMobileMenuOpen(false)}
@@ -2184,6 +2241,19 @@ export default function App() {
               >
                 Corporate Enquiries
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  handleOpenQuickLink('medical-tourism');
+                }}
+                className="w-full text-left text-sm font-semibold text-slate-800 hover:text-[#008080] py-1.5 cursor-pointer flex items-center justify-between"
+              >
+                <span>Medical Tourism</span>
+                <span className="text-[10px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200">
+                  Global Concierge
+                </span>
+              </button>
               <a
                 href="#partners"
                 onClick={() => setMobileMenuOpen(false)}
@@ -2191,6 +2261,32 @@ export default function App() {
               >
                 Partners &amp; Labs
               </a>
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  navigateTo('insurer', '/insurer-panel');
+                }}
+                className="w-full text-left text-sm font-semibold text-slate-800 hover:text-[#008080] py-1.5 cursor-pointer flex items-center justify-between"
+              >
+                <span>Insurer TPA Panel</span>
+                <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                  Claims Audit
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  navigateTo('api-gateway', '/partner-api');
+                }}
+                className="w-full text-left text-sm font-semibold text-slate-800 hover:text-[#008080] py-1.5 cursor-pointer flex items-center justify-between"
+              >
+                <span>Partner API Gateway</span>
+                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                  REST &amp; HMAC
+                </span>
+              </button>
               <a
                 href="#contact"
                 onClick={() => setMobileMenuOpen(false)}
@@ -2226,26 +2322,27 @@ export default function App() {
                 <span>Partner With Us Portal (/partner-with-us)</span>
               </button>
 
-
-
               {isLoggedIn && currentUser ? (
                 <div className="flex flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      navigateTo('dashboard', '/dashboard');
-                    }}
-                    className="w-full flex items-center justify-between py-2.5 px-3 rounded-lg bg-teal-50 hover:bg-teal-100 text-[#008080] border border-teal-200 text-xs font-bold cursor-pointer"
-                  >
-                    <span className="flex items-center gap-2">
-                      <Activity className="w-4 h-4 text-[#008080]" />
-                      <span>My Dashboard ({currentUser.role || currentUser.accountType || 'Portal'})</span>
-                    </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-200 text-teal-900 font-bold">
-                      Open Console →
-                    </span>
-                  </button>
+                  {/* For partner roles (non-Patient), show Partner Operations Console */}
+                  {currentUser.role !== 'Patient' && currentUser.accountType !== 'Patient' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        navigateTo('dashboard', '/dashboard');
+                      }}
+                      className="w-full flex items-center justify-between py-2.5 px-3 rounded-lg bg-teal-50 hover:bg-teal-100 text-[#008080] border border-teal-200 text-xs font-bold cursor-pointer"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-[#008080]" />
+                        <span>Partner Console ({currentUser.role || currentUser.accountType})</span>
+                      </span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-200 text-teal-900 font-bold">
+                        Open →
+                      </span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
@@ -2285,17 +2382,6 @@ export default function App() {
                   <span>Patient Login &amp; Registration (/auth)</span>
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  navigateTo('patient-dashboard', '/patient-dashboard');
-                }}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-[#00172d] hover:bg-[#00223f] text-cyan-300 border border-cyan-800/40 text-xs font-semibold cursor-pointer"
-              >
-                <Activity className="w-4 h-4 text-cyan-400" />
-                <span>Patient Dashboard (/patient-dashboard)</span>
-              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -4542,15 +4628,6 @@ export default function App() {
                     className="hover:text-white transition-colors text-left cursor-pointer"
                   >
                     Grievance Redressal
-                  </button>
-                </li>
-                <li>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenQuickLink('team-logins')}
-                    className="text-teal-300 hover:text-white font-semibold transition-colors text-left cursor-pointer flex items-center gap-1"
-                  >
-                    Team Logins (Secure gateway)
                   </button>
                 </li>
               </ul>

@@ -125,7 +125,14 @@ export const BookingConfirmationModal: React.FC<BookingConfirmationModalProps> =
               <div>
                 <span className="font-semibold text-slate-500">Schedule: </span>
                 <span className="font-bold text-slate-900">{booking.preferredDate}</span>
-                <span className="text-slate-600 block text-[11px]">{booking.preferredTimeSlot}</span>
+                <span className="text-slate-600 block text-[11px]">
+                  {booking.preferredTimeSlot}
+                  {booking.durationDays && booking.durationDays > 1 && (
+                    <span className="ml-2 px-2 py-0.5 rounded-full bg-teal-100 text-[#008080] font-bold text-[10px]">
+                      {booking.durationDays} Days Package
+                    </span>
+                  )}
+                </span>
               </div>
             </div>
 
@@ -145,7 +152,82 @@ export const BookingConfirmationModal: React.FC<BookingConfirmationModalProps> =
                 {booking.whatsapp && <span className="text-emerald-600 ml-2 font-medium">(WhatsApp: +91 {booking.whatsapp})</span>}
               </div>
             </div>
+
+            {/* Uploaded Medical Documents Info */}
+            {booking.uploadedMedicalDocs && booking.uploadedMedicalDocs.length > 0 && (
+              <div className="pt-2 border-t border-slate-100">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 block mb-1">
+                  Attached Medical Documents (Insurance Pre-Authorization)
+                </span>
+                <div className="space-y-1">
+                  {booking.uploadedMedicalDocs.map((doc, dIdx) => (
+                    <div key={`conf-doc-${dIdx}`} className="flex items-center gap-2 text-[11px] text-slate-600">
+                      <FileText className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      <span className="font-medium truncate">{doc.name}</span>
+                      <span className="text-slate-400">({doc.size})</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* AUTOMATED MULTI-DAY TOKEN ENGINE SCHEDULE */}
+          {booking.multiDayTokens && booking.multiDayTokens.length > 1 && (
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-teal-50 via-slate-50 to-blue-50 border border-teal-200 text-left space-y-2.5 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-[#008080]" />
+                  <span className="text-xs font-black uppercase tracking-wider text-[#002b49]">
+                    Multi-Day Token Schedule ({booking.multiDayTokens.length} Days)
+                  </span>
+                </div>
+                <span className="text-[10px] bg-teal-200 text-teal-900 font-bold px-2 py-0.5 rounded-full">
+                  12:00 AM Midnight Rollover
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                Each daily visit requires that specific calendar day's token. Fresh tokens activate automatically at 12:00 AM midnight with strict 1-day validity.
+              </p>
+
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {booking.multiDayTokens.map((item) => (
+                  <div
+                    key={item.tokenId}
+                    className={`p-2.5 rounded-xl border flex items-center justify-between text-xs ${
+                      item.status === 'active'
+                        ? 'bg-white border-teal-500 shadow-2xs ring-1 ring-teal-400'
+                        : 'bg-white/80 border-slate-200 text-slate-600'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-black text-slate-900">Day {item.dayNumber}</span>
+                        <span className="text-slate-500 text-[11px]">({item.date})</span>
+                      </div>
+                      <div className="font-mono text-[11px] font-bold text-[#008080] mt-0.5">
+                        {item.tokenId}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      {item.status === 'active' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-black text-[10px]">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                          <span>Active Today (1-Day Valid)</span>
+                        </span>
+                      ) : item.status === 'expired' ? (
+                        <span className="text-[10px] text-slate-400 font-bold">1-Day Expired</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-bold text-[10px]">
+                          <span>Unlocks 12:00 AM</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* History Status Callout */}
           {booking.isGuest ? (

@@ -29,6 +29,17 @@ export interface BookingFormData {
   agreeTerms: boolean;
   agreePrivacy: boolean;
   insuranceClaim?: import('./insurance').InsuranceClaimDetails;
+  durationDays?: number; // Duration of visit package in days (for doctor home visits)
+  uploadedMedicalDocs?: Array<{ name: string; size: string; type: string; url?: string }>;
+}
+
+export interface MultiDayTokenItem {
+  dayNumber: number;
+  date: string; // YYYY-MM-DD
+  tokenId: string; // NHT-DHV-D1-XXXX
+  validFrom: string; // 12:00 AM midnight
+  validUntil: string; // 11:59 PM same day
+  status: 'active' | 'scheduled' | 'expired' | 'redeemed';
 }
 
 export interface UserAccount {
@@ -69,5 +80,8 @@ export interface ConfirmedBooking {
   serviceCategory?: string;
   secureTokenId?: string;
   qrStatus?: 'active' | 'used' | 'expired';
+  durationDays?: number;
+  uploadedMedicalDocs?: Array<{ name: string; size: string; type: string; url?: string }>;
+  multiDayTokens?: MultiDayTokenItem[];
 }
 
