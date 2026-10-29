@@ -140,6 +140,8 @@ import { AdminServicesManager } from './AdminServicesManager';
 import { getStoredMarqueeServices, MARQUEE_SERVICES_UPDATED_EVENT } from '../utils/marqueeServicesStorage';
 import { AdminPushNotificationsManager } from './AdminPushNotificationsManager';
 import { getStoredPushNotifications, PUSH_NOTIFICATIONS_UPDATED_EVENT } from '../utils/pushNotificationStorage';
+import { AdminSubAdminsManager } from './AdminSubAdminsManager';
+import { getStoredStaffAccounts } from '../utils/staffAccessStorage';
 
 interface AdminDashboardPageProps {
   partners: PartnerApplication[];
@@ -151,7 +153,7 @@ interface AdminDashboardPageProps {
   onNavigateOnboarding: () => void;
 }
 
-type AlignmentTab = 'All' | 'Pending' | 'Live' | 'Suspended' | 'HighRisk' | 'Enquiries' | 'VitalScans' | 'GuestBookings' | 'Advertising' | 'Testimonials' | 'PartnerLogos' | 'MarqueeServices' | 'Services' | 'Partners' | 'Accreditations' | 'PushNotifications' | 'PartnerApis';
+type AlignmentTab = 'All' | 'Pending' | 'Live' | 'Suspended' | 'HighRisk' | 'Enquiries' | 'VitalScans' | 'GuestBookings' | 'Advertising' | 'Testimonials' | 'PartnerLogos' | 'MarqueeServices' | 'Services' | 'Partners' | 'Accreditations' | 'PushNotifications' | 'PartnerApis' | 'AccessControl';
 
 export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
   partners,
@@ -212,7 +214,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
 
   // Dashboard Filters & UI State (Phase 3 Alignment: 4 Primary Buckets)
   const [searchQuery, setSearchQuery] = useState('');
-  const VALID_ADMIN_TABS: AlignmentTab[] = ['All', 'Pending', 'Live', 'Suspended', 'HighRisk', 'Enquiries', 'VitalScans', 'GuestBookings', 'Advertising', 'Testimonials', 'PartnerLogos', 'MarqueeServices', 'Services', 'Partners', 'Accreditations', 'PushNotifications', 'PartnerApis'];
+  const VALID_ADMIN_TABS: AlignmentTab[] = ['All', 'Pending', 'Live', 'Suspended', 'HighRisk', 'Enquiries', 'VitalScans', 'GuestBookings', 'Advertising', 'Testimonials', 'PartnerLogos', 'MarqueeServices', 'Services', 'Partners', 'Accreditations', 'PushNotifications', 'PartnerApis', 'AccessControl'];
   const [rawAlignmentTab, setRawAlignmentTab] = useState<AlignmentTab>(() => {
     if (typeof window !== 'undefined') {
       const hash = window.location.hash.replace('#', '') as AlignmentTab;
@@ -1859,6 +1861,46 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
               Webhooks &amp; Gateway
             </span>
           </div>
+
+          {/* Card 15: Sub-Admins & Access Control */}
+          <div
+            onClick={() => setAlignmentTab('AccessControl')}
+            className={`p-4 rounded-2xl border transition-all cursor-pointer shadow-2xs hover:shadow-md ${
+              alignmentTab === 'AccessControl'
+                ? 'bg-amber-950 text-white border-amber-400 ring-2 ring-amber-400/40'
+                : 'bg-white border-slate-200 hover:border-amber-400'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className={`text-[11px] font-bold uppercase tracking-wider block ${
+                alignmentTab === 'AccessControl' ? 'text-amber-300' : 'text-amber-950'
+              }`}>
+                Sub-Admins &amp; Access
+              </span>
+              <KeyRound className={`w-4 h-4 ${alignmentTab === 'AccessControl' ? 'text-amber-300' : 'text-amber-600'}`} />
+            </div>
+            <div className="flex items-baseline gap-1.5 mt-1">
+              <span className={`text-xl font-black ${
+                alignmentTab === 'AccessControl' ? 'text-white' : 'text-amber-900'
+              }`}>
+                {getStoredStaffAccounts().length} Staff
+              </span>
+              {getStoredStaffAccounts().filter((a) => a.approvalStatus === 'PendingApproval').length > 0 ? (
+                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 animate-pulse">
+                  {getStoredStaffAccounts().filter((a) => a.approvalStatus === 'PendingApproval').length} Pending
+                </span>
+              ) : (
+                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                  {getStoredStaffAccounts().filter((a) => a.loginEnabled).length} Active
+                </span>
+              )}
+            </div>
+            <span className={`text-[10.5px] font-medium mt-0.5 block truncate ${
+              alignmentTab === 'AccessControl' ? 'text-slate-300' : 'text-slate-500'
+            }`}>
+              Rights &amp; Enable/Disable
+            </span>
+          </div>
         </div>
 
         {/* ------------------------------------------------------------- */}
@@ -2207,11 +2249,38 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                   Confidential
                 </span>
               </button>
+
+              {/* Dedicated Tab: Sub-Admin & Permissions Management */}
+              <button
+                type="button"
+                onClick={() => setAlignmentTab('AccessControl')}
+                className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5 ${
+                  alignmentTab === 'AccessControl'
+                    ? 'bg-amber-600 text-white shadow-xs border border-amber-400'
+                    : 'bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-200'
+                }`}
+              >
+                <KeyRound className="w-3.5 h-3.5" />
+                <span>Sub-Admins &amp; Permissions</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                    alignmentTab === 'AccessControl'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-amber-200 text-amber-900'
+                  }`}
+                >
+                  Access Control
+                </span>
+              </button>
             </div>
 
             {/* Quick Count Badge */}
             <div className="text-xs text-slate-500 font-medium">
-              {alignmentTab === 'PartnerApis' ? (
+              {alignmentTab === 'AccessControl' ? (
+                <span>
+                  Admin Governance: <strong>Sub-Admin Creation, Custom Rights &amp; Dynamic Login Enable/Disable</strong>
+                </span>
+              ) : alignmentTab === 'PartnerApis' ? (
                 <span>
                   Confidential Module: <strong>Enterprise Partner API &amp; Webhook Engine</strong> (REST Connectors &amp; OAuth 2.0)
                 </span>
@@ -2518,7 +2587,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
         {/* ------------------------------------------------------------- */}
         {/* TAB PANELS: SERVICES, PARTNERS, ACCREDITATIONS, ADVERTISING, VITAL SCANS, GUEST BOOKINGS, ENQUIRIES, OR PARTNERS */}
         {/* ------------------------------------------------------------- */}
-        {alignmentTab === 'PartnerApis' ? (
+        {alignmentTab === 'AccessControl' ? (
+          <AdminSubAdminsManager />
+        ) : alignmentTab === 'PartnerApis' ? (
           <div className="space-y-6 animate-fade-in">
             {/* Header with partner type selector */}
             <div className="bg-slate-900 text-white p-5 rounded-3xl border border-teal-500/30 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">

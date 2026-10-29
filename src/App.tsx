@@ -72,6 +72,8 @@ import { InsurerPartnerPortal } from './components/InsurerPartnerPortal';
 import { PartnerApiGatewayPortal } from './components/PartnerApiGatewayPortal';
 import { TestimonialsCarousel } from './components/TestimonialsCarousel';
 import { PatientFeedbackModal } from './components/PatientFeedbackModal';
+import { HrPortalPage } from './components/HrPortalPage';
+import { FooterQuickLinksModal, QuickLinkType } from './components/FooterQuickLinksModal';
 import { usePatientInactivityRefresh } from './hooks/usePatientInactivityRefresh';
 import {
   PartnerLogoItem,
@@ -268,6 +270,7 @@ type RoutePath =
   | 'doorstep-pharmacy'
   | 'insurer'
   | 'api-gateway'
+  | 'hrthings'
   | DedicatedServiceKey;
 
 export const VALID_ROUTES: RoutePath[] = [
@@ -283,6 +286,7 @@ export const VALID_ROUTES: RoutePath[] = [
   'doorstep-pharmacy',
   'insurer',
   'api-gateway',
+  'hrthings',
   'doctor-home-visits',
   'home-diagnostics',
   'xray-portable-diagnostics',
@@ -335,6 +339,7 @@ export function normalizeRoute(raw: string | null | undefined): RoutePath | null
   if (clean === 'doorstep-pharmacy' || clean === 'pharmacy' || clean === 'medicines' || clean === 'medicine' || clean === 'online-pharmacy') return 'doorstep-pharmacy';
   if (clean === 'insurer' || clean === 'insurer-portal' || clean === 'insurer-panel' || clean === 'insurance-partner') return 'insurer';
   if (clean === 'api-gateway' || clean === 'api' || clean === 'developer-api' || clean === 'api-docs' || clean === 'docs') return 'api-gateway';
+  if (clean === 'hrthings' || clean === 'hr' || clean === 'hr-portal' || clean === 'hrportal') return 'hrthings';
   
   const dedicated = getServiceDedicatedRoute(clean);
   if (dedicated) return dedicated;
@@ -817,6 +822,13 @@ export default function App() {
   const [vitalLensOpen, setVitalLensOpen] = useState(false);
   const [voiceAssistantOpen, setVoiceAssistantOpen] = useState(false);
   const [customPrefillSymptoms, setCustomPrefillSymptoms] = useState('');
+  const [quickLinksModalOpen, setQuickLinksModalOpen] = useState(false);
+  const [activeQuickLink, setActiveQuickLink] = useState<QuickLinkType | null>(null);
+
+  const handleOpenQuickLink = (type: QuickLinkType) => {
+    setActiveQuickLink(type);
+    setQuickLinksModalOpen(true);
+  };
 
   // Search, Navigation & Auth States
   const [searchModalOpen, setSearchModalOpen] = useState(false);
@@ -1533,6 +1545,15 @@ export default function App() {
         onNavigateHome={() => navigateTo('home', '/')}
         onNavigatePartner={() => navigateTo('partner-with-us', '/partner-with-us')}
         onNavigateCorporate={() => navigateTo('corporate-enquiries', '/corporate-enquiries')}
+      />
+    );
+  }
+
+  if (currentRoute === 'hrthings') {
+    return (
+      <HrPortalPage
+        onNavigateHome={() => navigateTo('home', '/')}
+        onNavigateAdmin={() => navigateTo('command-center', '/command-center')}
       />
     );
   }
@@ -4478,6 +4499,60 @@ export default function App() {
                     Contact Us
                   </a>
                 </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenQuickLink('media-press')}
+                    className="hover:text-white transition-colors text-left cursor-pointer"
+                  >
+                    Media / Press
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenQuickLink('social-responsibility')}
+                    className="hover:text-white transition-colors text-left cursor-pointer"
+                  >
+                    Social Responsibility
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenQuickLink('investors-panel')}
+                    className="hover:text-white transition-colors text-left cursor-pointer"
+                  >
+                    Investors Panel
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenQuickLink('medical-tourism')}
+                    className="hover:text-white transition-colors text-left cursor-pointer"
+                  >
+                    Medical Tourism
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenQuickLink('grievance-redressal')}
+                    className="hover:text-white transition-colors text-left cursor-pointer"
+                  >
+                    Grievance Redressal
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenQuickLink('team-logins')}
+                    className="text-teal-300 hover:text-white font-semibold transition-colors text-left cursor-pointer flex items-center gap-1"
+                  >
+                    Team Logins (Secure gateway)
+                  </button>
+                </li>
               </ul>
             </div>
 
@@ -4594,6 +4669,14 @@ export default function App() {
           name: currentUser?.name,
           phone: currentUser?.phone,
         }}
+      />
+
+      {/* Footer Quick Links Modal */}
+      <FooterQuickLinksModal
+        isOpen={quickLinksModalOpen}
+        activeType={activeQuickLink}
+        onClose={() => setQuickLinksModalOpen(false)}
+        onNavigateToRoute={(route, urlPath) => navigateTo(route as any, urlPath)}
       />
 
       {/* Modern Responsive Floating Action Button (FAB) Menu - "Quick Look" (Bottom-Right Corner) */}
