@@ -32,7 +32,9 @@ import {
   Activity,
   Users,
   Ban,
-  RotateCcw
+  RotateCcw,
+  KeyRound,
+  Fingerprint
 } from 'lucide-react';
 import { DashboardRole } from '../types/dashboard';
 import {
@@ -43,6 +45,8 @@ import {
   INACTIVITY_THRESHOLD_DAYS
 } from '../types/partner';
 import { UserAccount } from '../types/serviceBooking';
+import { AccountRecoveryModal } from './AccountRecoveryModal';
+import { verifyUserPasskey, getStoredPasskeys } from '../utils/passkeyAuthStorage';
 
 interface AuthPageProps {
   onSuccess: (user: UserAccount) => void;
@@ -140,6 +144,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [showAccountPassword, setShowAccountPassword] = useState(false);
   const [accountPasswordError, setAccountPasswordError] = useState('');
   const [accountSearchIdentifier, setAccountSearchIdentifier] = useState('');
+  // Security Upgrade: Passkey Authentication & Account Recovery State
+  const [showRecoveryModal, setShowRecoveryModal] = useState<boolean>(false);
+  const [recoveryDefaultId, setRecoveryDefaultId] = useState<string>('');
+  const [patientPasskeyMode, setPatientPasskeyMode] = useState<boolean>(false);
+  const [patientPasskeyInput, setPatientPasskeyInput] = useState<string>('');
+  const [partnerPasskeyMode, setPartnerPasskeyMode] = useState<boolean>(false);
+  const [partnerPasskeyInput, setPartnerPasskeyInput] = useState<string>('');
 
   const [isLoading, setIsLoading] = useState(false);
   const [googleAuthLoading, setGoogleAuthLoading] = useState(false);
@@ -835,6 +846,149 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     }, 600);
   };
 
+  // Fast In-App Passkey Login for Patients
+  const handlePatientPasskeyLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    const targetId = loginMethod === 'phone' ? loginPhone.trim() : loginEmail.trim();
+    if (!targetId) {
+      setErrorMsg(`Please enter your registered ${loginMethod === 'phone' ? 'mobile number' : 'email'} first.`);
+      return;
+    }
+    if (!patientPasskeyInput.trim()) {
+      setErrorMsg('Please enter your secure 4-8 digit Passkey.');
+      return;
+    }
+
+    setIsLoading(true);
+    setTimeout(() => {
+      setIsLoading(false);
+      const isVerified = verifyUserPasskey(targetId, patientPasskeyInput);
+      if (!isVerified) {
+        setErrorMsg('Invalid Passkey entered. Use "Forgot Username / Password" if you need to recover or reset.');
+        return;
+      }
+
+      const identities = getStoredIdentities();
+      const cleanDigits = targetId.replace(/\D/g, '');
+      const existing = identities.find(
+        (i) =>
+          (cleanDigits.length >= 8 && i.phone.replace(/\D/g, '').includes(cleanDigits)) ||
+          i.email.toLowerCase() === targetId.toLowerCase()
+      );
+
+      const user: UserAccount = {
+        id: existing ? existing.id : 'USR-' + Math.floor(10000 + Math.random() * 90000),
+        name: existing ? existing.name : (targetId.includes('@') ? targetId.split('@')[0] : 'Verified Patient'),
+        phone: existing ? existing.phone : targetId,
+        email: existing?.email || (targetId.includes('@') ? targetId : `${targetId}@nhealth.in`),
+        accountType: 'Patient',
+        roles: existing ? existing.roles : ['Patient'],
+        provider: 'phone',
+      };
+
+      saveIdentity({
+        id: user.id,
+        name: user.name,
+        phone: user.phone,
+        email: user.email || '',
+        roles: user.roles || ['Patient'],
+        city: existing?.city || 'Hyderabad',
+        provider: 'phone',
+        createdAt: existing ? existing.createdAt : new Date().toISOString(),
+        lastLoginAt: new Date().toISOString(),
+      });
+
+      localStorage.setItem('nhealth_user', JSON.stringify(user));
+      setSuccessMsg('✓ Secure Passkey Authentication Successful! Redirecting to Patient Portal...');
+      setTimeout(() => onSuccess(user), 400);
+    }, 400);
+  };
+
+  // Fast In-App Passkey Login for Healthcare Partners
+  const handlePartnerPasskeyLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+    setPendingPartnerNotice(null);
+
+    const cleanId = partnerLoginId.trim().toLowerCase();
+    if (!cleanId) {
+      setErrorMsg('Please enter your Partner Login ID or Registered Email.');
+      return;
+    }
+    if (!partnerPasskeyInput.trim()) {
+      setErrorMsg('Please enter your secure 4-8 digit Passkey.');
+      return;
+    }
+
+    setIsLoading(true);
+    setTimeout(() => {
+      setIsLoading(false);
+      const isVerified = verifyUserPasskey(cleanId, partnerPasskeyInput);
+      if (!isVerified) {
+        setErrorMsg('Invalid Partner Passkey. Please verify your passkey or use Forgot Password to recover.');
+        return;
+      }
+
+      const allPartners = [...partners, ...INITIAL_PARTNERS];
+      const matchedPartner = allPartners.find(
+        (p) =>
+          p.email.toLowerCase() === cleanId ||
+          p.loginIdOrEmail?.toLowerCase() === cleanId ||
+          p.id.toLowerCase() === cleanId ||
+          p.phone.replace(/\D/g, '') === cleanId.replace(/\D/g, '')
+      );
+
+      if (!matchedPartner) {
+        setErrorMsg('No healthcare partner account found with this identifier. Please check credentials or register.');
+        return;
+      }
+
+      if (isPartnerSuspended(matchedPartner)) {
+        setSuspendedPartnerNotice(matchedPartner);
+        setErrorMsg(`Account Suspended due to Inactivity: "${matchedPartner.entityName}" has remained inactive >90 days.`);
+        return;
+      }
+
+      if (matchedPartner.status === 'Pending') {
+        setPendingPartnerNotice(matchedPartner);
+        setErrorMsg(`Account Under Review: The application for "${matchedPartner.entityName}" has not yet been approved.`);
+        return;
+      }
+
+      const partnerAccount: UserAccount = {
+        id: matchedPartner.id,
+        name: matchedPartner.contactPerson || matchedPartner.entityName,
+        phone: matchedPartner.phone,
+        email: matchedPartner.email,
+        accountType: 'Partner',
+        role: matchedPartner.category,
+        entityName: matchedPartner.entityName,
+        roles: ['Partner', matchedPartner.category],
+        provider: 'email',
+      };
+
+      saveIdentity({
+        id: matchedPartner.id,
+        name: partnerAccount.name,
+        phone: matchedPartner.phone,
+        email: matchedPartner.email,
+        roles: ['Partner', matchedPartner.category],
+        city: matchedPartner.city,
+        provider: 'email',
+        createdAt: matchedPartner.submittedAt,
+        lastLoginAt: new Date().toISOString(),
+      });
+
+      localStorage.setItem('nhealth_user', JSON.stringify(partnerAccount));
+      setSuccessMsg(`✓ Welcome, ${matchedPartner.entityName}! Passkey Authentication Verified.`);
+      setTimeout(() => onSuccess(partnerAccount), 400);
+    }, 400);
+  };
+
   // Handle Single Identity Patient Registration
   const handleSignupSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1465,149 +1619,256 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   {/* Google OAuth Button (Requirement 3) */}
                   {renderGoogleButton('login')}
 
-                  {/* Sub-toggle: Phone OTP vs Email */}
-                  <div className="flex items-center gap-4 text-xs border-b border-slate-100 pb-3">
+                  {/* Login Mode Toggle: Standard vs Passkey (Authentication Security Upgrade) */}
+                  <div className="flex items-center justify-between p-1.5 bg-slate-100 rounded-xl">
                     <button
                       type="button"
-                      onClick={() => setLoginMethod('phone')}
-                      className={`font-bold pb-1 cursor-pointer transition-colors ${
-                        loginMethod === 'phone'
-                          ? 'text-[#008080] border-b-2 border-[#008080]'
-                          : 'text-slate-400 hover:text-slate-600'
+                      onClick={() => setPatientPasskeyMode(false)}
+                      className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        !patientPasskeyMode
+                          ? 'bg-white text-[#002b49] shadow-xs'
+                          : 'text-slate-500 hover:text-slate-800'
                       }`}
                     >
-                      Login via Mobile OTP
+                      Standard Login
                     </button>
                     <button
                       type="button"
-                      onClick={() => setLoginMethod('email')}
-                      className={`font-bold pb-1 cursor-pointer transition-colors ${
-                        loginMethod === 'email'
-                          ? 'text-[#008080] border-b-2 border-[#008080]'
-                          : 'text-slate-400 hover:text-slate-600'
+                      onClick={() => setPatientPasskeyMode(true)}
+                      className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        patientPasskeyMode
+                          ? 'bg-[#008080] text-white shadow-xs'
+                          : 'text-teal-700 hover:text-teal-900'
                       }`}
                     >
-                      Login via Email &amp; Password
+                      <KeyRound className="w-3.5 h-3.5" />
+                      <span>🔑 Sign In with Passkey</span>
                     </button>
                   </div>
 
-                  <form onSubmit={handlePatientLoginSubmit} className="space-y-4">
-                    {loginMethod === 'phone' ? (
+                  {patientPasskeyMode ? (
+                    /* PASSKEY LOGIN VIEW */
+                    <form onSubmit={handlePatientPasskeyLogin} className="space-y-4 animate-in fade-in duration-200">
+                      <div className="p-3 bg-teal-50 border border-teal-200 rounded-xl text-teal-900 text-xs flex items-start gap-2">
+                        <Fingerprint className="w-4 h-4 text-[#008080] shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-bold">Fast Passkey Authentication</p>
+                          <p className="text-[11px] text-teal-700">Enter your registered mobile or email and custom Passkey to authenticate securely without typing long passwords.</p>
+                        </div>
+                      </div>
+
                       <div>
                         <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                          Registered Mobile Number <span className="text-red-500">*</span>
+                          Registered Mobile Number or Email <span className="text-red-500">*</span>
                         </label>
-                        <div className="flex gap-1.5 sm:gap-2 w-full min-w-0">
-                          <div className="flex items-center px-2.5 sm:px-3 bg-slate-100 border border-slate-300 rounded-xl text-xs font-bold text-slate-600 shrink-0">
-                            🇮🇳 +91
-                          </div>
+                        <div className="relative">
+                          <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                           <input
-                            type="tel"
-                            maxLength={10}
-                            placeholder="10-digit number"
-                            value={loginPhone}
-                            onChange={(e) => setLoginPhone(e.target.value.replace(/\D/g, ''))}
-                            disabled={loginOtpSent}
-                            className="min-w-0 flex-1 px-3 sm:px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#008080]"
+                            type="text"
+                            required
+                            placeholder="e.g. 9876543210 or patient@example.com"
+                            value={loginMethod === 'phone' ? loginPhone : loginEmail}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (loginMethod === 'phone') setLoginPhone(val);
+                              else setLoginEmail(val);
+                            }}
+                            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#008080]"
                           />
-                          {!loginOtpSent && (
-                            <button
-                              type="button"
-                              onClick={handleSendLoginOtp}
-                              disabled={isLoading || loginPhone.length < 10}
-                              className="px-3.5 sm:px-4 py-2.5 rounded-xl bg-[#008080] hover:bg-[#006666] active:bg-[#005555] text-white text-xs font-bold disabled:opacity-50 transition-all cursor-pointer whitespace-nowrap shrink-0 shadow-xs"
-                            >
-                              Get OTP
-                            </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="block text-xs font-bold text-slate-700">
+                            Custom Passkey (4–8 Digits) <span className="text-red-500">*</span>
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRecoveryDefaultId(loginMethod === 'phone' ? loginPhone : loginEmail);
+                              setShowRecoveryModal(true);
+                            }}
+                            className="text-[11px] font-bold text-[#008080] hover:underline cursor-pointer"
+                          >
+                            Forgot Passkey / Password?
+                          </button>
+                        </div>
+                        <div className="relative">
+                          <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                          <input
+                            type="password"
+                            required
+                            maxLength={8}
+                            placeholder="Enter 4-8 digit secure Passkey"
+                            value={patientPasskeyInput}
+                            onChange={(e) => setPatientPasskeyInput(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-[#008080]"
+                          />
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          Passkeys can be set or updated inside your Patient Profile Settings.
+                        </p>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full py-3 rounded-xl bg-gradient-to-r from-[#008080] to-[#009b9b] hover:from-[#006666] hover:to-[#008080] text-white font-bold text-sm shadow-md transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <KeyRound className="w-4 h-4" />
+                        <span>{isLoading ? 'Verifying Passkey...' : 'Sign In with Passkey'}</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </form>
+                  ) : (
+                    /* STANDARD LOGIN VIEW */
+                    <form onSubmit={handlePatientLoginSubmit} className="space-y-4">
+                      {loginMethod === 'phone' ? (
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                            Registered Mobile Number <span className="text-red-500">*</span>
+                          </label>
+                          <div className="flex gap-1.5 sm:gap-2 w-full min-w-0">
+                            <div className="flex items-center px-2.5 sm:px-3 bg-slate-100 border border-slate-300 rounded-xl text-xs font-bold text-slate-600 shrink-0">
+                              🇮🇳 +91
+                            </div>
+                            <input
+                              type="tel"
+                              maxLength={10}
+                              placeholder="10-digit number"
+                              value={loginPhone}
+                              onChange={(e) => setLoginPhone(e.target.value.replace(/\D/g, ''))}
+                              disabled={loginOtpSent}
+                              className="min-w-0 flex-1 px-3 sm:px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#008080]"
+                            />
+                            {!loginOtpSent && (
+                              <button
+                                type="button"
+                                onClick={handleSendLoginOtp}
+                                disabled={isLoading || loginPhone.length < 10}
+                                className="px-3.5 sm:px-4 py-2.5 rounded-xl bg-[#008080] hover:bg-[#006666] active:bg-[#005555] text-white text-xs font-bold disabled:opacity-50 transition-all cursor-pointer whitespace-nowrap shrink-0 shadow-xs"
+                              >
+                                Get OTP
+                              </button>
+                            )}
+                          </div>
+
+                          {loginOtpSent && (
+                            <div className="mt-4 animate-in fade-in duration-200">
+                              <div className="flex items-center justify-between mb-1.5">
+                                <label className="block text-xs font-bold text-slate-700">
+                                  6-Digit Verification Code
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() => setLoginOtpSent(false)}
+                                  className="text-[11px] font-bold text-[#008080] hover:underline cursor-pointer"
+                                >
+                                  Change Number
+                                </button>
+                              </div>
+                              <input
+                                type="text"
+                                maxLength={6}
+                                placeholder="e.g. 482910"
+                                value={loginOtp}
+                                onChange={(e) => setLoginOtp(e.target.value.replace(/\D/g, ''))}
+                                className="w-full tracking-widest text-center text-lg font-mono font-bold px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#008080]"
+                              />
+                              <p className="text-[11px] text-slate-500 mt-1">
+                                Demo access code is automatically pre-filled.
+                              </p>
+                            </div>
                           )}
                         </div>
+                      ) : (
+                        <>
+                          <div>
+                            <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                              Email Address <span className="text-red-500">*</span>
+                            </label>
+                            <div className="relative">
+                              <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                              <input
+                                type="email"
+                                placeholder="patient@example.com"
+                                value={loginEmail}
+                                onChange={(e) => setLoginEmail(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#008080]"
+                              />
+                            </div>
+                          </div>
 
-                        {loginOtpSent && (
-                          <div className="mt-4 animate-in fade-in duration-200">
+                          <div>
                             <div className="flex items-center justify-between mb-1.5">
                               <label className="block text-xs font-bold text-slate-700">
-                                6-Digit Verification Code
+                                Password <span className="text-red-500">*</span>
                               </label>
                               <button
                                 type="button"
-                                onClick={() => setLoginOtpSent(false)}
+                                onClick={() => {
+                                  setRecoveryDefaultId(loginEmail);
+                                  setShowRecoveryModal(true);
+                                }}
                                 className="text-[11px] font-bold text-[#008080] hover:underline cursor-pointer"
                               >
-                                Change Number
+                                Forgot Password?
                               </button>
                             </div>
-                            <input
-                              type="text"
-                              maxLength={6}
-                              placeholder="e.g. 482910"
-                              value={loginOtp}
-                              onChange={(e) => setLoginOtp(e.target.value.replace(/\D/g, ''))}
-                              className="w-full tracking-widest text-center text-lg font-mono font-bold px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#008080]"
-                            />
-                            <p className="text-[11px] text-slate-500 mt-1">
-                              Demo access code is automatically pre-filled.
-                            </p>
+                            <div className="relative">
+                              <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                              <input
+                                type={showPassword ? 'text' : 'password'}
+                                placeholder="Enter password"
+                                value={loginPassword}
+                                onChange={(e) => setLoginPassword(e.target.value)}
+                                className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#008080]"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-600"
+                              >
+                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    ) : (
-                      <>
-                        <div>
-                          <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                            Email Address <span className="text-red-500">*</span>
-                          </label>
-                          <div className="relative">
-                            <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-                            <input
-                              type="email"
-                              placeholder="patient@example.com"
-                              value={loginEmail}
-                              onChange={(e) => setLoginEmail(e.target.value)}
-                              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#008080]"
-                            />
-                          </div>
-                        </div>
+                        </>
+                      )}
 
-                        <div>
-                          <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                            Password <span className="text-red-500">*</span>
-                          </label>
-                          <div className="relative">
-                            <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-                            <input
-                              type={showPassword ? 'text' : 'password'}
-                              placeholder="Enter password"
-                              value={loginPassword}
-                              onChange={(e) => setLoginPassword(e.target.value)}
-                              className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#008080]"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowPassword(!showPassword)}
-                              className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-600"
-                            >
-                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </button>
-                          </div>
+                      {/* Forgot Username/Password recovery link for phone as well */}
+                      {loginMethod === 'phone' && (
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRecoveryDefaultId(loginPhone);
+                              setShowRecoveryModal(true);
+                            }}
+                            className="text-xs font-bold text-[#008080] hover:underline cursor-pointer"
+                          >
+                            Forgot Username / Password?
+                          </button>
                         </div>
-                      </>
-                    )}
+                      )}
 
-                    <button
-                      type="submit"
-                      disabled={isLoading}
-                      className="w-full mt-2 py-3 rounded-xl bg-gradient-to-r from-[#008080] to-[#009b9b] hover:from-[#006666] hover:to-[#008080] text-white font-bold text-sm shadow-md transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      <span>
-                        {isLoading
-                          ? 'Verifying...'
-                          : loginOtpSent
-                          ? 'Verify & Access Patient Portal'
-                          : 'Continue to Nhealth'}
-                      </span>
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  </form>
+                      <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full mt-2 py-3 rounded-xl bg-gradient-to-r from-[#008080] to-[#009b9b] hover:from-[#006666] hover:to-[#008080] text-white font-bold text-sm shadow-md transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <span>
+                          {isLoading
+                            ? 'Verifying...'
+                            : loginOtpSent
+                            ? 'Verify & Access Patient Portal'
+                            : 'Continue to Nhealth'}
+                        </span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </form>
+                  )}
                 </div>
               )}
 
@@ -1779,81 +2040,190 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   {/* Google OAuth Button for Partners */}
                   {renderGoogleButton('partner')}
 
-                  {/* Partner Credentials Form */}
-                  <form onSubmit={handlePartnerLoginSubmit} className="space-y-4">
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <label className="block text-xs font-bold text-slate-700">
+                  {/* Partner Login Mode Toggle: Standard vs Passkey */}
+                  <div className="flex items-center justify-between p-1.5 bg-slate-100 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setPartnerPasskeyMode(false)}
+                      className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        !partnerPasskeyMode
+                          ? 'bg-white text-[#002b49] shadow-xs'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      Partner Standard Login
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPartnerPasskeyMode(true)}
+                      className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        partnerPasskeyMode
+                          ? 'bg-[#008080] text-white shadow-xs'
+                          : 'text-teal-700 hover:text-teal-900'
+                      }`}
+                    >
+                      <KeyRound className="w-3.5 h-3.5" />
+                      <span>🔑 Partner Passkey</span>
+                    </button>
+                  </div>
+
+                  {partnerPasskeyMode ? (
+                    /* PARTNER PASSKEY VIEW */
+                    <form onSubmit={handlePartnerPasskeyLogin} className="space-y-4 animate-in fade-in duration-200">
+                      <div className="p-3 bg-teal-50 border border-teal-200 rounded-xl text-teal-900 text-xs flex items-start gap-2">
+                        <Fingerprint className="w-4 h-4 text-[#008080] shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-bold">Partner Fast Passkey Access</p>
+                          <p className="text-[11px] text-teal-700">Enter your Partner Login ID / Email and your secure Passkey to launch your Partner Dashboard.</p>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5">
                           Partner Login ID / Registered Email <span className="text-red-500">*</span>
                         </label>
-                        {onNavigatePartnerOnboarding && (
+                        <div className="relative">
+                          <Building2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. partner.labs@thyrocare.com or dr.meera@nambiarclinic.com"
+                            value={partnerLoginId}
+                            onChange={(e) => setPartnerLoginId(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#008080]"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="block text-xs font-bold text-slate-700">
+                            Partner Custom Passkey <span className="text-red-500">*</span>
+                          </label>
                           <button
                             type="button"
-                            onClick={onNavigatePartnerOnboarding}
+                            onClick={() => {
+                              setRecoveryDefaultId(partnerLoginId);
+                              setShowRecoveryModal(true);
+                            }}
                             className="text-[11px] font-bold text-[#008080] hover:underline cursor-pointer"
                           >
-                            New Partner? Apply Here
+                            Forgot Username / Password?
                           </button>
-                        )}
+                        </div>
+                        <div className="relative">
+                          <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                          <input
+                            type="password"
+                            required
+                            maxLength={8}
+                            placeholder="Enter 4-8 digit secure Passkey"
+                            value={partnerPasskeyInput}
+                            onChange={(e) => setPartnerPasskeyInput(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-[#008080]"
+                          />
+                        </div>
                       </div>
-                      <div className="relative">
-                        <Building2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-                        <input
-                          type="text"
-                          required
-                          placeholder="e.g. partner.labs@thyrocare.com or dr.meera@nambiarclinic.com"
-                          value={partnerLoginId}
-                          onChange={(e) => setPartnerLoginId(e.target.value)}
-                          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#008080]"
-                        />
+
+                      <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full py-3 rounded-xl bg-gradient-to-r from-[#002b49] via-[#003859] to-[#002b49] hover:from-[#00172b] hover:to-[#00172b] text-white font-bold text-sm shadow-md transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <KeyRound className="w-4 h-4 text-teal-300" />
+                        <span>{isLoading ? 'Verifying Partner Passkey...' : 'Sign In with Passkey'}</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </form>
+                  ) : (
+                    /* PARTNER STANDARD FORM */
+                    <form onSubmit={handlePartnerLoginSubmit} className="space-y-4">
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="block text-xs font-bold text-slate-700">
+                            Partner Login ID / Registered Email <span className="text-red-500">*</span>
+                          </label>
+                          {onNavigatePartnerOnboarding && (
+                            <button
+                              type="button"
+                              onClick={onNavigatePartnerOnboarding}
+                              className="text-[11px] font-bold text-[#008080] hover:underline cursor-pointer"
+                            >
+                              New Partner? Apply Here
+                            </button>
+                          )}
+                        </div>
+                        <div className="relative">
+                          <Building2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. partner.labs@thyrocare.com or dr.meera@nambiarclinic.com"
+                            value={partnerLoginId}
+                            onChange={(e) => setPartnerLoginId(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#008080]"
+                          />
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          Enter the credentials created during your partner onboarding submission.
+                        </p>
                       </div>
-                      <p className="text-[10px] text-slate-400 mt-1">
-                        Enter the credentials created during your partner onboarding submission.
-                      </p>
-                    </div>
 
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                        Partner Account Password <span className="text-red-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-                        <input
-                          type={showPartnerPassword ? 'text' : 'password'}
-                          required
-                          placeholder="Enter your partner portal password"
-                          value={partnerPassword}
-                          onChange={(e) => setPartnerPassword(e.target.value)}
-                          className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#008080]"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPartnerPassword(!showPartnerPassword)}
-                          className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-600 cursor-pointer"
-                        >
-                          {showPartnerPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="block text-xs font-bold text-slate-700">
+                            Partner Account Password <span className="text-red-500">*</span>
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRecoveryDefaultId(partnerLoginId);
+                              setShowRecoveryModal(true);
+                            }}
+                            className="text-[11px] font-bold text-[#008080] hover:underline cursor-pointer"
+                          >
+                            Forgot Password?
+                          </button>
+                        </div>
+                        <div className="relative">
+                          <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                          <input
+                            type={showPartnerPassword ? 'text' : 'password'}
+                            required
+                            placeholder="Enter your partner portal password"
+                            value={partnerPassword}
+                            onChange={(e) => setPartnerPassword(e.target.value)}
+                            className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#008080]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPartnerPassword(!showPartnerPassword)}
+                            className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-600 cursor-pointer"
+                          >
+                            {showPartnerPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Partner Credential Activation Note */}
-                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 text-[11px] flex items-start gap-2">
-                      <ShieldCheck className="w-4 h-4 text-[#008080] shrink-0 mt-0.5" />
-                      <span>
-                        Note: Credentials for new partner applications become active once your application is approved by the Nhealth Admin.
-                      </span>
-                    </div>
+                      {/* Partner Credential Activation Note */}
+                      <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 text-[11px] flex items-start gap-2">
+                        <ShieldCheck className="w-4 h-4 text-[#008080] shrink-0 mt-0.5" />
+                        <span>
+                          Note: Credentials for new partner applications become active once your application is approved by the Nhealth Admin.
+                        </span>
+                      </div>
 
-                    <button
-                      type="submit"
-                      disabled={isLoading}
-                      className="w-full py-3 rounded-xl bg-gradient-to-r from-[#002b49] via-[#003859] to-[#002b49] hover:from-[#00172b] hover:to-[#00172b] text-white font-bold text-sm shadow-md transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      <Stethoscope className="w-4 h-4 text-teal-300" />
-                      <span>{isLoading ? 'Authenticating Partner...' : 'Sign In to Partner Portal'}</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  </form>
+                      <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full py-3 rounded-xl bg-gradient-to-r from-[#002b49] via-[#003859] to-[#002b49] hover:from-[#00172b] hover:to-[#00172b] text-white font-bold text-sm shadow-md transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <Stethoscope className="w-4 h-4 text-teal-300" />
+                        <span>{isLoading ? 'Authenticating Partner...' : 'Sign In to Partner Portal'}</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </form>
+                  )}
 
                   {/* Partner Onboarding Quick Link */}
                   {onNavigatePartnerOnboarding && (
@@ -2257,6 +2627,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           </div>
         </div>
       )}
+
+      {/* Forgot Username / Password OTP Recovery Modal */}
+      <AccountRecoveryModal
+        isOpen={showRecoveryModal}
+        onClose={() => setShowRecoveryModal(false)}
+        defaultIdentifier={recoveryDefaultId}
+        onRecoverySuccess={(newIdentifier) => {
+          setSuccessMsg(`✓ Password & Credentials successfully reset for ${newIdentifier}! Please log in with your new credentials or Passkey.`);
+        }}
+      />
 
       {/* Footer Strip */}
       <footer className="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">

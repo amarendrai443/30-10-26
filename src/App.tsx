@@ -56,6 +56,8 @@ import { SymptomDoctorFinder } from './components/SymptomDoctorFinder';
 import { HowNhealthWorks } from './components/HowNhealthWorks';
 import { UniversalSearchFilter } from './components/UniversalSearchFilter';
 import { AuthPage } from './components/AuthPage';
+import { AccountRecoveryModal } from './components/AccountRecoveryModal';
+import { verifyUserPasskey } from './utils/passkeyAuthStorage';
 import { PartnerOnboardingPage } from './components/PartnerOnboardingPage';
 import { AdminDashboardPage } from './components/AdminDashboardPage';
 import { CorporateEnquiriesPage } from './components/CorporateEnquiriesPage';
@@ -852,6 +854,10 @@ export default function App() {
   const [loginMode, setLoginMode] = useState<'login' | 'signup'>('login');
   const [loginPhone, setLoginPhone] = useState('');
   const [loginSubmitted, setLoginSubmitted] = useState(false);
+  const [loginPasskeyMode, setLoginPasskeyMode] = useState(false);
+  const [loginPasskeyInput, setLoginPasskeyInput] = useState('');
+  const [loginPasskeyError, setLoginPasskeyError] = useState('');
+  const [loginRecoveryModalOpen, setLoginRecoveryModalOpen] = useState(false);
 
   const [partnerModalOpen, setPartnerModalOpen] = useState(false);
   const [partnerSubmitted, setPartnerSubmitted] = useState(false);
@@ -4142,27 +4148,41 @@ export default function App() {
             </div>
 
             {/* Login / Signup Switcher */}
-            <div className="flex p-1 bg-slate-100 rounded-xl mb-6">
+            <div className="flex p-1 bg-slate-100 rounded-xl mb-4">
               <button
                 type="button"
                 onClick={() => {
                   setLoginMode('login');
+                  setLoginPasskeyMode(false);
                   setLoginSubmitted(false);
                 }}
                 className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                  loginMode === 'login' ? 'bg-white text-[#002b49] shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                  loginMode === 'login' && !loginPasskeyMode ? 'bg-white text-[#002b49] shadow-xs' : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                Sign In
+                Standard Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginPasskeyMode(true);
+                  setLoginSubmitted(false);
+                }}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                  loginPasskeyMode ? 'bg-[#008080] text-white shadow-xs' : 'text-teal-700 hover:text-teal-900'
+                }`}
+              >
+                <span>🔑 Passkey</span>
               </button>
               <button
                 type="button"
                 onClick={() => {
                   setLoginMode('signup');
+                  setLoginPasskeyMode(false);
                   setLoginSubmitted(false);
                 }}
                 className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                  loginMode === 'signup' ? 'bg-white text-[#002b49] shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                  loginMode === 'signup' && !loginPasskeyMode ? 'bg-white text-[#002b49] shadow-xs' : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
                 Register
@@ -4182,7 +4202,7 @@ export default function App() {
               <div className="bg-teal-50 border border-teal-200 rounded-xl p-6 text-center space-y-3">
                 <CheckCircle2 className="w-10 h-10 text-[#008080] mx-auto" />
                 <h4 className="text-base font-bold text-[#002b49]">
-                  {loginMode === 'login' ? 'Signed In Successfully!' : 'Account Created Successfully!'}
+                  {loginPasskeyMode ? 'Passkey Verified Successfully!' : loginMode === 'login' ? 'Signed In Successfully!' : 'Account Created Successfully!'}
                 </h4>
                 <p className="text-xs text-slate-600">
                   Welcome <strong>{currentUser?.name || loginName || 'Patient'}</strong>. Your account is now active with mobile number <strong>{loginPhone || '+91 93939 34621'}</strong>.
@@ -4198,7 +4218,108 @@ export default function App() {
                   Continue to Health Dashboard
                 </button>
               </div>
+            ) : loginPasskeyMode ? (
+              /* PASSKEY LOGIN VIEW */
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  setLoginPasskeyError('');
+                  const cleanPhone = loginPhone.replace(/\D/g, '');
+                  if (!cleanPhone) {
+                    setLoginPasskeyError('Please enter your mobile number or registered email.');
+                    return;
+                  }
+                  if (!loginPasskeyInput.trim()) {
+                    setLoginPasskeyError('Please enter your secure 4-8 digit Passkey.');
+                    return;
+                  }
+                  const ok = verifyUserPasskey(cleanPhone, loginPasskeyInput);
+                  if (!ok) {
+                    setLoginPasskeyError('Invalid Passkey. You can reset it using "Forgot Username / Password".');
+                    return;
+                  }
+
+                  const userObj: UserAccount = {
+                    id: 'USER-' + Date.now(),
+                    name: loginName.trim() || 'Verified Citizen',
+                    phone: cleanPhone,
+                    accountType: 'Patient & Family Caretaker',
+                  };
+
+                  setIsLoggedIn(true);
+                  setCurrentUser(userObj);
+                  try {
+                    localStorage.setItem('nhealth_user', JSON.stringify(userObj));
+                  } catch {}
+
+                  if (loginRedirectFromBooking && pendingDraftBooking) {
+                    finalizeBooking(pendingDraftBooking, false, userObj.id);
+                    setLoginRedirectFromBooking(false);
+                    setLoginModalOpen(false);
+                    setLoginSubmitted(false);
+                  } else {
+                    setLoginSubmitted(true);
+                  }
+                }}
+                className="space-y-4"
+              >
+                {loginPasskeyError && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs">
+                    {loginPasskeyError}
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Registered Mobile Number <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-3 text-xs font-semibold text-slate-400">+91</span>
+                    <input
+                      type="tel"
+                      required
+                      placeholder="98765 43210"
+                      value={loginPhone}
+                      onChange={(e) => setLoginPhone(e.target.value)}
+                      className="w-full pl-12 pr-4 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#008080]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-slate-700">
+                      Secure Passkey (4–8 Digits) <span className="text-red-500">*</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setLoginRecoveryModalOpen(true)}
+                      className="text-[11px] font-bold text-[#008080] hover:underline cursor-pointer"
+                    >
+                      Forgot Username / Password?
+                    </button>
+                  </div>
+                  <input
+                    type="password"
+                    maxLength={8}
+                    required
+                    placeholder="Enter your custom Passkey"
+                    value={loginPasskeyInput}
+                    onChange={(e) => setLoginPasskeyInput(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-[#008080]"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">Default demo passkey: 1234</p>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full bg-[#008080] hover:bg-[#006666] text-white font-bold py-3 rounded-lg text-xs shadow-md transition-all active:scale-[0.99] cursor-pointer mt-2"
+                >
+                  {loginRedirectFromBooking ? 'Authenticate & Confirm Booking' : 'Sign In with Passkey'}
+                </button>
+              </form>
             ) : (
+              /* STANDARD FORM */
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -4271,6 +4392,16 @@ export default function App() {
                   </select>
                 </div>
 
+                <div className="flex justify-end pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setLoginRecoveryModalOpen(true)}
+                    className="text-xs font-bold text-[#008080] hover:underline cursor-pointer"
+                  >
+                    Forgot Username / Password?
+                  </button>
+                </div>
+
                 <button
                   type="submit"
                   className="w-full bg-[#002b49] hover:bg-[#001d31] text-white font-bold py-3 rounded-lg text-xs shadow-md transition-all active:scale-[0.99] cursor-pointer mt-2"
@@ -4290,6 +4421,16 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Forgot Username / Password Recovery Modal */}
+      <AccountRecoveryModal
+        isOpen={loginRecoveryModalOpen}
+        onClose={() => setLoginRecoveryModalOpen(false)}
+        defaultIdentifier={loginPhone}
+        onRecoverySuccess={(newU) => {
+          setLoginPhone(newU);
+        }}
+      />
 
       {/* Partner With Us & Corporate Enquiries Modal */}
       {partnerModalOpen && (

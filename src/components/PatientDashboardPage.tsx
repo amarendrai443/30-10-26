@@ -43,8 +43,11 @@ import {
   Upload,
   Tag,
   QrCode,
+  KeyRound,
+  Fingerprint,
 } from 'lucide-react';
 import { UserAccount, ConfirmedBooking } from '../types/serviceBooking';
+import { saveUserPasskey, getStoredPasskeys } from '../utils/passkeyAuthStorage';
 import { AdBannerItem, getActiveBanners } from '../utils/advertisingStorage';
 import { navHistory } from '../utils/navigationHistory';
 import { EXTRACTED_SERVICES } from '../data/servicesData';
@@ -707,6 +710,44 @@ export const PatientDashboardPage: React.FC<PatientDashboardPageProps> = ({
   const patientName = currentUser?.name || 'Ramesh Kumar';
   const patientPhone = currentUser?.phone || '9876543210';
   const patientEmail = currentUser?.email || 'patient@nhealth.in';
+
+  // In-App Passkey Login Configuration State
+  const [configuredPasskey, setConfiguredPasskey] = useState<string>(() => {
+    const keys = getStoredPasskeys();
+    const cleanPhone = patientPhone.replace(/\D/g, '');
+    return keys[cleanPhone] || keys[patientEmail.toLowerCase()] || '1234';
+  });
+  const [passkeyInput, setPasskeyInput] = useState<string>('');
+  const [passkeyEditing, setPasskeyEditing] = useState<boolean>(false);
+  const [passkeySuccessMsg, setPasskeySuccessMsg] = useState<string>('');
+  const [passkeyErrorMsg, setPasskeyErrorMsg] = useState<string>('');
+
+  const handleSavePasskey = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasskeyErrorMsg('');
+    setPasskeySuccessMsg('');
+
+    const val = passkeyInput.trim();
+    if (val.length < 4 || val.length > 8) {
+      setPasskeyErrorMsg('Passkey must be between 4 and 8 digits.');
+      return;
+    }
+
+    const cleanPhone = patientPhone.replace(/\D/g, '');
+    saveUserPasskey(cleanPhone, val);
+    if (patientEmail) {
+      saveUserPasskey(patientEmail, val);
+    }
+    if (currentUser?.id) {
+      saveUserPasskey(currentUser.id, val);
+    }
+
+    setConfiguredPasskey(val);
+    setPasskeyInput('');
+    setPasskeyEditing(false);
+    setPasskeySuccessMsg('✓ New Passkey saved successfully! You can now use this to instantly sign in on any device.');
+    setTimeout(() => setPasskeySuccessMsg(''), 5000);
+  };
 
   // Dynamic Client-Side PDF Generation for Vital Lens Report via jsPDF
   const handleDownloadVitalPDF = async (scan: CompactVitalScan) => {
@@ -2797,6 +2838,120 @@ export const PatientDashboardPage: React.FC<PatientDashboardPageProps> = ({
                     Call
                   </a>
                 </div>
+              </div>
+
+              {/* Security Upgrade Requirement 2: In-App Passkey Login Configuration Card */}
+              <div className={`p-6 rounded-2xl border shadow-xs space-y-4 ${
+                isDark ? 'bg-[#00172d] border-cyan-900/40 text-white shadow-xl' : 'bg-white border-slate-200 text-slate-800'
+              }`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-cyan-900/30">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-[#008080] dark:text-teal-300">
+                      <KeyRound className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className={`text-sm font-black ${isDark ? 'text-white' : 'text-[#002b49]'}`}>
+                        In-App Passkey Login Configuration
+                      </h4>
+                      <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Configure a custom numeric or alphanumeric Passkey for fast, passwordless authentication across mobile &amp; desktop.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" />
+                      <span>Passkey Active</span>
+                    </span>
+                  </div>
+                </div>
+
+                {passkeySuccessMsg && (
+                  <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/40 text-emerald-800 dark:text-emerald-200 text-xs font-medium flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>{passkeySuccessMsg}</span>
+                  </div>
+                )}
+
+                {passkeyErrorMsg && (
+                  <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/40 text-red-700 dark:text-red-300 text-xs font-medium flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                    <span>{passkeyErrorMsg}</span>
+                  </div>
+                )}
+
+                {!passkeyEditing ? (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-cyan-900/30">
+                    <div className="space-y-1">
+                      <div className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                        <Fingerprint className="w-4 h-4 text-[#008080]" />
+                        <span>Registered Passkey Status:</span>
+                        <span className="font-mono text-xs tracking-widest bg-white dark:bg-black/30 px-2 py-0.5 rounded border border-slate-200 dark:border-cyan-900/40 font-bold">
+                          •••• {configuredPasskey ? `(${configuredPasskey.length} digits)` : '(Not Set)'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        Linked to mobile number <strong>+91 {patientPhone}</strong> &amp; email <strong>{patientEmail}</strong>.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPasskeyInput('');
+                        setPasskeyErrorMsg('');
+                        setPasskeyEditing(true);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#008080] to-[#009b9b] hover:from-[#006666] hover:to-[#008080] text-white text-xs font-bold shadow-xs transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
+                    >
+                      <KeyRound className="w-3.5 h-3.5" />
+                      <span>Change / Set New Passkey</span>
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleSavePasskey} className="space-y-3.5 p-4 rounded-xl bg-teal-50/50 dark:bg-cyan-950/20 border border-teal-200 dark:border-cyan-800/40">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
+                        Enter New Secure Passkey (4 to 8 Digits) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="password"
+                        maxLength={8}
+                        required
+                        autoFocus
+                        placeholder="e.g. 1234 or 2026"
+                        value={passkeyInput}
+                        onChange={(e) => setPasskeyInput(e.target.value)}
+                        className={`w-full max-w-sm px-3.5 py-2.5 rounded-xl border text-sm font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-[#008080] ${
+                          isDark ? 'bg-black/40 border-cyan-800 text-white' : 'bg-white border-slate-300 text-slate-900'
+                        }`}
+                      />
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                        Use this passkey to sign in instantly via the "🔑 Sign In with Passkey" button on the login screen.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 pt-1">
+                      <button
+                        type="submit"
+                        className="px-4 py-2 rounded-xl bg-[#008080] hover:bg-[#006666] text-white text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Save Passkey</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPasskeyEditing(false);
+                          setPasskeyErrorMsg('');
+                        }}
+                        className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
               </div>
             </div>
           )}
