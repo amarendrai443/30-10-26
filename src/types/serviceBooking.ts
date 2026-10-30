@@ -31,6 +31,9 @@ export interface BookingFormData {
   insuranceClaim?: import('./insurance').InsuranceClaimDetails;
   durationDays?: number; // Duration of visit package in days (for doctor home visits)
   uploadedMedicalDocs?: Array<{ name: string; size: string; type: string; url?: string }>;
+  patientLatitude?: number;
+  patientLongitude?: number;
+  patientGpsAccuracy?: number;
 }
 
 export interface MultiDayTokenItem {
@@ -83,5 +86,17 @@ export interface ConfirmedBooking {
   durationDays?: number;
   uploadedMedicalDocs?: Array<{ name: string; size: string; type: string; url?: string }>;
   multiDayTokens?: MultiDayTokenItem[];
+  patientLatitude?: number;
+  patientLongitude?: number;
+  patientGpsAccuracy?: number;
+  doctorLatitude?: number;
+  doctorLongitude?: number;
+  doctorGpsVerified?: boolean;
+  doctorVerificationTime?: string;
+  doctorVerificationDistanceMeters?: number;
+  otpVerified?: boolean;
+  otpEntered?: string;
+  assignedDoctorName?: string;
+  assignedDoctorId?: string;
 }
 

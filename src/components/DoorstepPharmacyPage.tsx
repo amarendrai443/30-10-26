@@ -597,11 +597,17 @@ export const DoorstepPharmacyPage: React.FC<DoorstepPharmacyPageProps> = ({
         <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <button
-              onClick={onBackToHome}
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.history.length > 1) {
+                  window.history.back();
+                } else {
+                  onBackToHome();
+                }
+              }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#001d31] hover:bg-[#003e6b] text-teal-300 text-xs sm:text-sm font-semibold transition-all border border-teal-500/20 active:scale-95 cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Back to Home</span>
+              <span>Back</span>
             </button>
             <div className="h-5 w-px bg-slate-700 hidden sm:block" />
             <div className="flex items-center gap-2">

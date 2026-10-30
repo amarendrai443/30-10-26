@@ -374,11 +374,17 @@ export const OnlineConsultationPage: React.FC<OnlineConsultationPageProps> = ({
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={onBackToHome}
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.history.length > 1) {
+                  window.history.back();
+                } else {
+                  onBackToHome();
+                }
+              }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-[#008080] text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Back to Home</span>
+              <span>Back</span>
             </button>
             <div className="h-5 w-px bg-slate-200 hidden sm:block" />
             <div>

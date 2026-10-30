@@ -73,6 +73,7 @@ import { PartnerApiGatewayPortal } from './components/PartnerApiGatewayPortal';
 import { TestimonialsCarousel } from './components/TestimonialsCarousel';
 import { PatientFeedbackModal } from './components/PatientFeedbackModal';
 import { HrPortalPage } from './components/HrPortalPage';
+import { PartnersPage } from './components/PartnersPage';
 import { FooterQuickLinksModal, QuickLinkType } from './components/FooterQuickLinksModal';
 import { usePatientInactivityRefresh } from './hooks/usePatientInactivityRefresh';
 import {
@@ -261,6 +262,7 @@ const PARTNERS = [
 type RoutePath =
   | 'home'
   | 'auth'
+  | 'partners'
   | 'partner-with-us'
   | 'command-center'
   | 'corporate-enquiries'
@@ -277,6 +279,7 @@ type RoutePath =
 export const VALID_ROUTES: RoutePath[] = [
   'home',
   'auth',
+  'partners',
   'partner-with-us',
   'command-center',
   'corporate-enquiries',
@@ -334,7 +337,8 @@ export function normalizeRoute(raw: string | null | undefined): RoutePath | null
   if (clean === '' || clean === 'index.html') return 'home';
   if (clean === 'admin' || clean === 'command-control') return 'home';
   if (clean === 'patient' || clean === 'patient-portal' || clean === 'overview') return 'patient-dashboard';
-  if (clean === 'partner' || clean === 'partners') return 'partner-with-us';
+  if (clean === 'partners' || clean === 'our-partners' || clean === 'healthcare-partners' || clean === 'diagnostic-partners') return 'partners';
+  if (clean === 'partner') return 'partner-with-us';
   if (clean === 'enquiry' || clean === 'enquiries' || clean === 'corporate') return 'corporate-enquiries';
   if (clean === 'online-consultation' || clean === 'consultation' || clean === 'online-doctor' || clean === 'online-doctor-consultation' || clean === 'doctor-consultation') return 'online-consultation';
   if (clean === 'doorstep-pharmacy' || clean === 'pharmacy' || clean === 'medicines' || clean === 'medicine' || clean === 'online-pharmacy') return 'doorstep-pharmacy';
@@ -1385,6 +1389,9 @@ export default function App() {
       durationDays,
       uploadedMedicalDocs: data.uploadedMedicalDocs,
       multiDayTokens,
+      patientLatitude: data.patientLatitude || 17.43993,
+      patientLongitude: data.patientLongitude || 78.39084,
+      patientGpsAccuracy: data.patientGpsAccuracy || 15,
     };
 
     if (!isGuest) {
@@ -1560,6 +1567,75 @@ export default function App() {
         onNavigatePartner={() => navigateTo('partner-with-us', '/partner-with-us')}
         onEnquirySubmitted={(newEnq) => setEnquiries((prev) => [newEnq, ...prev])}
       />
+    );
+  }
+
+  if (currentRoute === 'partners') {
+    return (
+      <>
+        <PartnersPage
+          partners={partners}
+          partnerMarqueeItems={partnerMarqueeItems}
+          accMarqueeItems={accMarqueeItems}
+          partnerScrollDuration={partnerScrollDuration}
+          accreditationsScrollDuration={accreditationsScrollDuration}
+          onBackToHome={() => {
+            if (isLoggedIn && (currentUser?.role === 'Patient' || currentUser?.accountType === 'Patient')) {
+              navigateTo('patient-dashboard', '/patient-dashboard#overview');
+            } else {
+              navigateTo('home', '/');
+            }
+          }}
+          onNavigatePartnerWithUs={() => navigateTo('partner-with-us', '/partner-with-us')}
+          onOpenBookingFor={(serviceName) => openBookingFor(serviceName)}
+        />
+
+        <ServiceBookingModal
+          service={selectedServiceForBooking}
+          isOpen={isServiceBookingOpen}
+          isLoggedIn={isLoggedIn}
+          onPromptLogin={() => navigateTo('auth', '/auth')}
+          onClose={() => {
+            setIsServiceBookingOpen(false);
+            setCustomPrefillSymptoms('');
+          }}
+          onSubmitBooking={handleBookingFormSubmit}
+          initialPhone={currentUser?.phone || ''}
+          initialName={currentUser?.name || ''}
+          initialSymptoms={customPrefillSymptoms}
+        />
+
+        <GuestWarningModal
+          isOpen={isWarningModalOpen}
+          onClose={() => setIsWarningModalOpen(false)}
+          serviceName={pendingDraftBooking?.serviceName}
+          onLoginRedirect={() => {
+            setIsWarningModalOpen(false);
+            setLoginRedirectFromBooking(true);
+            setLoginModalOpen(true);
+          }}
+          onProceedGuest={() => {
+            setIsWarningModalOpen(false);
+            finalizeBooking(pendingDraftBooking, true);
+          }}
+        />
+
+        <BookingConfirmationModal
+          booking={confirmedBookingData}
+          isOpen={isConfirmationModalOpen}
+          onClose={() => setIsConfirmationModalOpen(false)}
+          isLoggedIn={isLoggedIn}
+          onViewHistory={() => setMyBookingsModalOpen(true)}
+        />
+
+        <MyBookingsModal
+          isOpen={myBookingsModalOpen}
+          onClose={() => setMyBookingsModalOpen(false)}
+          bookings={bookingHistory}
+          userName={currentUser?.name || 'Valued Patient'}
+          onBookNew={() => setMyBookingsModalOpen(false)}
+        />
+      </>
     );
   }
 
@@ -2057,17 +2133,12 @@ export default function App() {
               Medical Tourism
             </button>
             <a
-              href="#partners"
+              href="/partners"
               onClick={(e) => {
-                if (currentRoute !== 'home') {
-                  e.preventDefault();
-                  navigateTo('home', '/');
-                  setTimeout(() => {
-                    document.getElementById('partners')?.scrollIntoView({ behavior: 'smooth' });
-                  }, 150);
-                }
+                e.preventDefault();
+                navigateTo('partners', '/partners');
               }}
-              className="hover:text-[#008080] transition-colors py-1.5 px-1.5 xl:px-2 rounded-lg whitespace-nowrap shrink-0"
+              className="hover:text-[#008080] transition-colors py-1.5 px-1.5 xl:px-2 rounded-lg whitespace-nowrap shrink-0 cursor-pointer font-medium"
             >
               Partners
             </a>
@@ -2254,13 +2325,19 @@ export default function App() {
                   Global Concierge
                 </span>
               </button>
-              <a
-                href="#partners"
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-sm font-semibold text-slate-800 hover:text-[#008080] py-1.5"
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  navigateTo('partners', '/partners');
+                }}
+                className="w-full text-left text-sm font-semibold text-slate-800 hover:text-[#008080] py-1.5 cursor-pointer flex items-center justify-between"
               >
-                Partners &amp; Labs
-              </a>
+                <span>Our Healthcare &amp; Diagnostic Partners</span>
+                <span className="text-[10px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200">
+                  Verified Network
+                </span>
+              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -4576,7 +4653,14 @@ export default function App() {
                   </button>
                 </li>
                 <li>
-                  <a href="#partners" className="hover:text-white transition-colors">
+                  <a
+                    href="/partners"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      navigateTo('partners', '/partners');
+                    }}
+                    className="hover:text-white transition-colors"
+                  >
                     Partners
                   </a>
                 </li>

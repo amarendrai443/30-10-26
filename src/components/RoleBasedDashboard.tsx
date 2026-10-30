@@ -52,6 +52,7 @@ import { AuthorizedPharmacyScannerModal } from './AuthorizedPharmacyScannerModal
 import { TokenDepartment } from '../types/secureToken';
 import { PartnerApiWebhookSettings } from './PartnerApiWebhookSettings';
 import { PartnerFinancialLedgerSection } from './PartnerFinancialLedgerSection';
+import { DoctorDashboardSection } from './DoctorDashboardSection';
 
 interface RoleBasedDashboardProps {
   currentUser: UserAccount;
@@ -403,11 +404,17 @@ export const RoleBasedDashboard: React.FC<RoleBasedDashboardProps> = ({
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <button
               type="button"
-              onClick={onNavigateHome}
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.history.length > 1) {
+                  window.history.back();
+                } else {
+                  onNavigateHome();
+                }
+              }}
               className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-300 hover:text-white px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Back to Public Site</span>
+              <span className="hidden sm:inline">Back</span>
             </button>
 
             <button
@@ -748,203 +755,16 @@ export const RoleBasedDashboard: React.FC<RoleBasedDashboardProps> = ({
         {/* ROLE 2: DOCTOR SPECIALIST DASHBOARD */}
         {/* ------------------------------------------------------------- */}
         {activeRole === 'Doctor' && (
-          <div className="space-y-6">
-            {/* Status & Availability Bar */}
-            <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-teal-500/20 text-[#008080] flex items-center justify-center font-bold">
-                  <Stethoscope className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-lg text-[#002b49]">
-                    Dr. Meera Nambiar (MD, Internal Medicine)
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    MCI Registration: MCI-84729-KA • Nhealth Accredited Primary Consultant
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl text-xs font-bold">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDoctorOnline(true);
-                      setGlobalDoctorOnlineStatus(true);
-                      showToast('Status updated: Live on Nhealth (Immediate Connect Enabled for Patients).');
-                    }}
-                    className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-                      doctorOnline ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600'
-                    }`}
-                  >
-                    ● Available for Calls
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDoctorOnline(false);
-                      setGlobalDoctorOnlineStatus(false);
-                      showToast('Status updated: Offline for Immediate Calls (Scheduled Slots Only).');
-                    }}
-                    className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-                      !doctorOnline ? 'bg-slate-700 text-white shadow-xs' : 'text-slate-600'
-                    }`}
-                  >
-                    Offline
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveModal('prescription')}
-                  className="px-4 py-2 rounded-xl bg-[#008080] hover:bg-[#006666] text-white font-bold text-xs transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                  <span>Create e-Prescription</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Doctor Metrics */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-              <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
-                  Today's Queue
-                </span>
-                <span className="text-2xl sm:text-3xl font-black text-[#002b49] mt-1 block">
-                  8 Patients
-                </span>
-                <span className="text-[11px] text-teal-600 font-semibold mt-0.5 block">
-                  4 Home Visits • 4 Video OPD
-                </span>
-              </div>
-              <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
-                  Completed Consults
-                </span>
-                <span className="text-2xl sm:text-3xl font-black text-emerald-600 mt-1 block">
-                  184 Consults
-                </span>
-                <span className="text-[11px] text-slate-500 font-semibold mt-0.5 block">
-                  Rating: 4.9 ★ (Verified)
-                </span>
-              </div>
-              <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
-                  Consultation Fee
-                </span>
-                <span className="text-2xl sm:text-3xl font-black text-[#008080] mt-1 block">
-                  ₹750 / visit
-                </span>
-                <span className="text-[11px] text-slate-500 font-semibold mt-0.5 block">
-                  Direct Bank Remittance
-                </span>
-              </div>
-              <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
-                  Lab Tests Referred
-                </span>
-                <span className="text-2xl sm:text-3xl font-black text-amber-700 mt-1 block">
-                  42 Patients
-                </span>
-                <span className="text-[11px] text-slate-500 font-semibold mt-0.5 block">
-                  Automated Results Sync
-                </span>
-              </div>
-            </div>
-
-            {/* Active Patient Consultation Queue */}
-            <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/90 shadow-2xs space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-[#008080]" />
-                  <h3 className="font-extrabold text-base text-[#002b49]">
-                    Scheduled Consultations Roster (Today)
-                  </h3>
-                </div>
-                <span className="text-xs text-slate-500 font-semibold">
-                  Auto-synced with Nhealth Care Coordinator
-                </span>
-              </div>
-
-              <div className="space-y-3">
-                {[
-                  {
-                    token: 1,
-                    patient: 'Ramesh Kumar (54 yrs, Male)',
-                    type: 'Home Visit',
-                    time: '11:00 AM',
-                    symptoms: 'Post-prandial glucose spike, leg swelling, hypertension review',
-                    phone: '9876543210',
-                    address: 'Plot 42, Jubilee Hills, Hyderabad',
-                  },
-                  {
-                    token: 2,
-                    patient: 'Ananya Sharma (Senior Citizen, 72 yrs)',
-                    type: 'Tele-Consultation (Video)',
-                    time: '12:30 PM',
-                    symptoms: 'Osteoarthritis knee stiffness, chronic cough follow-up',
-                    phone: '9845012345',
-                    address: 'Koramangala 4th Block, Bengaluru',
-                  },
-                  {
-                    token: 3,
-                    patient: 'K. Sunita (42 yrs, Female)',
-                    type: 'Home Visit',
-                    time: '04:00 PM',
-                    symptoms: 'Severe fever with chills, suspected dengue/malaria phlebotomy check',
-                    phone: '9440112233',
-                    address: 'Banjara Hills Rd 12, Hyderabad',
-                  },
-                ].map((item) => (
-                  <div
-                    key={item.token}
-                    className="p-4 rounded-2xl border border-slate-200 hover:border-teal-300 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-black px-2 py-0.5 rounded-md bg-[#002b49] text-white">
-                          Token #{item.token}
-                        </span>
-                        <span className="font-bold text-sm text-[#002b49]">{item.patient}</span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-50 text-[#008080] border border-teal-200">
-                          {item.type}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-600">
-                        <strong>Symptoms:</strong> {item.symptoms}
-                      </p>
-                      <span className="text-[11px] text-slate-400 block">
-                        📍 {item.address} • Contact: {item.phone} • Time: {item.time}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2 self-stretch sm:self-auto shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPrescriptionForm((prev) => ({ ...prev, patientName: item.patient }));
-                          setActiveModal('prescription');
-                        }}
-                        className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl bg-[#008080] hover:bg-[#006666] text-white font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                      >
-                        <FileText className="w-3.5 h-3.5" />
-                        <span>Prescribe</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => showToast(`Connecting secure encrypted tele-video call with ${item.patient}...`)}
-                        className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-all cursor-pointer"
-                      >
-                        Call Patient
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <DoctorDashboardSection
+            doctorName={currentUser.name || 'Dr. Suresh Reddy (MD)'}
+            doctorId={currentUser.id || 'DOC-8821'}
+            specialization={currentUser.specialty || 'General Physician & Home Care Specialist'}
+            onPrescribePatient={(patient) => {
+              setPrescriptionForm((prev) => ({ ...prev, patientName: patient }));
+              setActiveModal('prescription');
+            }}
+            onCallPatient={(phone, name) => showToast(`Connecting secure encrypted tele-video call with ${name}...`)}
+          />
         )}
 
         {/* ------------------------------------------------------------- */}
