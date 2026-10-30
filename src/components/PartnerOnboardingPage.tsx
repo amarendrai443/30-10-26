@@ -31,6 +31,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { PartnerCategory, PartnerApplication } from '../types/partner';
+import { EmailOtpVerificationModal } from './EmailOtpVerificationModal';
 
 interface PartnerOnboardingPageProps {
   onAddPartner: (newPartner: PartnerApplication) => void;
@@ -154,6 +155,11 @@ export const PartnerOnboardingPage: React.FC<PartnerOnboardingPageProps> = ({
   const [submittedPartner, setSubmittedPartner] = useState<PartnerApplication | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
+  // Email OTP Verification Workflow state for Partner Onboarding
+  const [showEmailOtpModal, setShowEmailOtpModal] = useState(false);
+  const [emailOtpCode, setEmailOtpCode] = useState('');
+  const [pendingPartner, setPendingPartner] = useState<PartnerApplication | null>(null);
+
   // File Upload states (All Departments)
   const [certDoc, setCertDoc] = useState<UploadedDoc | null>(null);
   const [govtIdDoc, setGovtIdDoc] = useState<UploadedDoc | null>(null);
@@ -201,6 +207,17 @@ export const PartnerOnboardingPage: React.FC<PartnerOnboardingPageProps> = ({
       return;
     }
 
+    const cleanEmail = form.email.trim();
+    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      setFormError('Please provide a valid official email address to receive your verification OTP.');
+      return;
+    }
+
+    if (!form.password || form.password.length < 8) {
+      setFormError('Partner password must be at least 8 characters long.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     const generatedId = 'PARTNER-' + Math.floor(10000 + Math.random() * 90000);
@@ -213,8 +230,8 @@ export const PartnerOnboardingPage: React.FC<PartnerOnboardingPageProps> = ({
       contactPerson: form.contactPerson || form.entityName,
       phone: form.phone,
       whatsappNumber: form.whatsappNumber || form.phone,
-      email: form.email,
-      loginIdOrEmail: form.loginIdOrEmail.trim() || form.email.trim(),
+      email: cleanEmail,
+      loginIdOrEmail: form.loginIdOrEmail.trim().toLowerCase() || cleanEmail.toLowerCase(),
       password: form.password,
       fullAddress: form.fullAddress,
       city: form.city,
@@ -247,11 +264,51 @@ export const PartnerOnboardingPage: React.FC<PartnerOnboardingPageProps> = ({
         : {}),
     };
 
+    // Step 1: Automatically generate secure OTP and prompt modal (do not create account yet)
     setTimeout(() => {
       setIsSubmitting(false);
-      onAddPartner(newPartner);
-      setSubmittedPartner(newPartner);
-    }, 600);
+      const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
+      setEmailOtpCode(generatedCode);
+      setPendingPartner(newPartner);
+      setShowEmailOtpModal(true);
+    }, 400);
+  };
+
+  // Step 3: Officially create partner account upon successful OTP verification
+  const handleVerifyPartnerEmailOtp = () => {
+    if (!pendingPartner) return;
+    setShowEmailOtpModal(false);
+
+    // Officially register partner on network
+    onAddPartner(pendingPartner);
+
+    // Save partner credentials into centralized identity database
+    try {
+      const raw = localStorage.getItem('nhealth_identities');
+      const current = raw ? JSON.parse(raw) : [];
+      const newIdentity = {
+        id: pendingPartner.id,
+        name: pendingPartner.contactPerson || pendingPartner.entityName,
+        username: (pendingPartner.loginIdOrEmail || pendingPartner.email).toLowerCase(),
+        phone: pendingPartner.phone,
+        email: pendingPartner.email,
+        password: pendingPartner.password,
+        roles: ['Partner', pendingPartner.category],
+        city: pendingPartner.city,
+        provider: 'email',
+        createdAt: pendingPartner.submittedAt,
+        lastLoginAt: new Date().toISOString(),
+      };
+      localStorage.setItem('nhealth_identities', JSON.stringify([newIdentity, ...current]));
+    } catch {}
+
+    setSubmittedPartner(pendingPartner);
+  };
+
+  const handleResendPartnerEmailOtp = (): string => {
+    const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+    setEmailOtpCode(newCode);
+    return newCode;
   };
 
   return (
@@ -993,6 +1050,17 @@ export const PartnerOnboardingPage: React.FC<PartnerOnboardingPageProps> = ({
           </div>
         )}
       </main>
+
+      {/* Email OTP Verification Modal for Partner Registration */}
+      <EmailOtpVerificationModal
+        isOpen={showEmailOtpModal}
+        email={form.email.trim()}
+        userType="Partner"
+        generatedOtp={emailOtpCode}
+        onVerifySuccess={handleVerifyPartnerEmailOtp}
+        onResendOtp={handleResendPartnerEmailOtp}
+        onClose={() => setShowEmailOtpModal(false)}
+      />
 
       {/* Footer */}
       <footer className="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">

@@ -32,6 +32,7 @@ export interface PartnerApplication {
   verifiedAt?: string;
   profileImage?: string;
   consultationFee?: number;
+  username?: string;
   loginIdOrEmail?: string;
   password?: string;
 

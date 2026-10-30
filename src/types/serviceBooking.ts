@@ -50,6 +50,8 @@ export interface UserAccount {
   name: string;
   phone: string;
   email?: string;
+  username?: string;
+  password?: string;
   accountType?: 'Patient' | 'Partner' | string;
   role?: string;
   entityName?: string;

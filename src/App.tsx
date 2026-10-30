@@ -39,6 +39,10 @@ import {
   Coins,
   Cpu,
   Mic,
+  Fingerprint,
+  Lock,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 import heroImg from './assets/images/nhealth_hero_healthcare_1791632199780.jpg';
@@ -58,6 +62,9 @@ import { UniversalSearchFilter } from './components/UniversalSearchFilter';
 import { AuthPage } from './components/AuthPage';
 import { AccountRecoveryModal } from './components/AccountRecoveryModal';
 import { verifyUserPasskey } from './utils/passkeyAuthStorage';
+import { BiometricSetupPromptModal } from './components/BiometricSetupPromptModal';
+import { EmailOtpVerificationModal } from './components/EmailOtpVerificationModal';
+import { hasBiometricForUser, authenticateNativeBiometric } from './utils/biometricAuthStorage';
 import { PartnerOnboardingPage } from './components/PartnerOnboardingPage';
 import { AdminDashboardPage } from './components/AdminDashboardPage';
 import { CorporateEnquiriesPage } from './components/CorporateEnquiriesPage';
@@ -117,6 +124,7 @@ import {
   getDepartmentLabel,
 } from './utils/secureQrToken';
 import { generateMultiDayTokens } from './utils/multiDayTokenEngine';
+import { MobileHeroSplitCarousel } from './components/MobileHeroSplitCarousel';
 
 
 const NHEALTH_LOGO_URL = 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
@@ -797,7 +805,10 @@ export default function App() {
     });
   };
 
-  const handleAuthSuccess = (user: UserAccount) => {
+  const [showBiometricSetupPrompt, setShowBiometricSetupPrompt] = useState(false);
+  const [pendingBiometricUser, setPendingBiometricUser] = useState<UserAccount | null>(null);
+
+  const proceedToDashboard = (user: UserAccount) => {
     setIsLoggedIn(true);
     setCurrentUser(user);
     try {
@@ -812,6 +823,68 @@ export default function App() {
     } else {
       navigateTo('dashboard', '/dashboard');
     }
+  };
+
+  const handleAuthSuccess = (user: UserAccount) => {
+    // Immediately following a successful login (for both Patients and Partners),
+    // display clean modal: "Setup Login with Biometric?"
+    const identifier = user.phone || user.email || user.id;
+    const hasBio = hasBiometricForUser(identifier);
+    if (!hasBio) {
+      setPendingBiometricUser(user);
+      setShowBiometricSetupPrompt(true);
+    } else {
+      proceedToDashboard(user);
+    }
+  };
+
+  const handleBiometricSetupDismiss = () => {
+    setShowBiometricSetupPrompt(false);
+    if (pendingBiometricUser) {
+      proceedToDashboard(pendingBiometricUser);
+      setPendingBiometricUser(null);
+    }
+  };
+
+  const handleBiometricSetupProceed = () => {
+    setShowBiometricSetupPrompt(false);
+    if (pendingBiometricUser) {
+      proceedToDashboard(pendingBiometricUser);
+      setPendingBiometricUser(null);
+    }
+  };
+
+  const handleAppEmailOtpSuccess = () => {
+    if (!pendingQuickSignupUser) return;
+    setAppEmailOtpModalOpen(false);
+
+    try {
+      const raw = localStorage.getItem('nhealth_identities');
+      const list = raw ? JSON.parse(raw) : [];
+      list.push(pendingQuickSignupUser.identity);
+      localStorage.setItem('nhealth_identities', JSON.stringify(list));
+    } catch {}
+
+    try {
+      localStorage.setItem('nhealth_user', JSON.stringify(pendingQuickSignupUser.user));
+    } catch {}
+
+    setIsLoggedIn(true);
+    setCurrentUser(pendingQuickSignupUser.user);
+
+    if (loginRedirectFromBooking && pendingDraftBooking) {
+      finalizeBooking(pendingDraftBooking, false, pendingQuickSignupUser.user.id);
+      setLoginRedirectFromBooking(false);
+      setLoginSubmitted(false);
+    } else {
+      setLoginSubmitted(true);
+    }
+  };
+
+  const handleResendAppEmailOtp = (): string => {
+    const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+    setAppEmailOtpCode(newCode);
+    return newCode;
   };
 
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
@@ -858,6 +931,19 @@ export default function App() {
   const [loginPasskeyInput, setLoginPasskeyInput] = useState('');
   const [loginPasskeyError, setLoginPasskeyError] = useState('');
   const [loginRecoveryModalOpen, setLoginRecoveryModalOpen] = useState(false);
+  const [loginIdentifier, setLoginIdentifier] = useState('');
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginConfirmPassword, setLoginConfirmPassword] = useState('');
+  const [showModalPassword, setShowModalPassword] = useState(false);
+  const [showModalConfirmPassword, setShowModalConfirmPassword] = useState(false);
+  const [modalPasswordError, setModalPasswordError] = useState('');
+
+  // Email OTP Verification Workflow state for Quick Patient Registration Modal
+  const [appEmailOtpModalOpen, setAppEmailOtpModalOpen] = useState(false);
+  const [appEmailOtpCode, setAppEmailOtpCode] = useState('');
+  const [pendingQuickSignupUser, setPendingQuickSignupUser] = useState<{ user: UserAccount; identity: any } | null>(null);
 
   const [partnerModalOpen, setPartnerModalOpen] = useState(false);
   const [partnerSubmitted, setPartnerSubmitted] = useState(false);
@@ -974,12 +1060,21 @@ export default function App() {
     initScroll();
     const initTimer = setTimeout(initScroll, 350);
 
-    const onMouseEnter = () => {
-      isMarqueeHovered.current = true;
-    };
+    // Smooth continuous horizontal auto-scroll loop (continuous scrolling, no hover pause)
+    const scrollLoop = () => {
+      if (el && !isMarqueeDragging.current && !isMarqueeTouched.current) {
+        el.scrollLeft += 0.85; // Smooth continuous horizontal scroll
 
-    const onMouseLeave = () => {
-      isMarqueeHovered.current = false;
+        const setW = el.scrollWidth / 3;
+        if (setW > 0) {
+          if (el.scrollLeft >= setW * 2) {
+            el.scrollLeft -= setW;
+          } else if (el.scrollLeft < setW) {
+            el.scrollLeft += setW;
+          }
+        }
+      }
+      animId = requestAnimationFrame(scrollLoop);
     };
 
     const onTouchStart = () => {
@@ -998,28 +1093,9 @@ export default function App() {
       if (resumeTouchTimeout) clearTimeout(resumeTouchTimeout);
     };
 
-    el.addEventListener('mouseenter', onMouseEnter);
-    el.addEventListener('mouseleave', onMouseLeave);
     el.addEventListener('touchstart', onTouchStart, { passive: true });
     el.addEventListener('touchend', onTouchEnd, { passive: true });
     el.addEventListener('touchcancel', onTouchCancel, { passive: true });
-
-    // Smooth continuous horizontal auto-scroll loop
-    const scrollLoop = () => {
-      if (el && !isMarqueeHovered.current && !isMarqueeDragging.current && !isMarqueeTouched.current) {
-        el.scrollLeft += 0.85; // Smooth continuous horizontal scroll
-
-        const setW = el.scrollWidth / 3;
-        if (setW > 0) {
-          if (el.scrollLeft >= setW * 2) {
-            el.scrollLeft -= setW;
-          } else if (el.scrollLeft < setW) {
-            el.scrollLeft += setW;
-          }
-        }
-      }
-      animId = requestAnimationFrame(scrollLoop);
-    };
 
     animId = requestAnimationFrame(scrollLoop);
 
@@ -1027,8 +1103,6 @@ export default function App() {
       cancelAnimationFrame(animId);
       clearTimeout(initTimer);
       if (resumeTouchTimeout) clearTimeout(resumeTouchTimeout);
-      el.removeEventListener('mouseenter', onMouseEnter);
-      el.removeEventListener('mouseleave', onMouseLeave);
       el.removeEventListener('touchstart', onTouchStart);
       el.removeEventListener('touchend', onTouchEnd);
       el.removeEventListener('touchcancel', onTouchCancel);
@@ -1529,14 +1603,22 @@ export default function App() {
   // Dedicated Page Routing Views (/auth, /partner-with-us, /command-center)
   if (currentRoute === 'auth') {
     return (
-      <AuthPage
-        onSuccess={handleAuthSuccess}
-        onNavigateHome={() => navigateTo('home', '/')}
-        onNavigatePartnerOnboarding={() => navigateTo('partner-with-us', '/partner-with-us')}
-        onNavigateAdmin={() => navigateTo('command-center', '/command-center')}
-        partners={partners}
-        onUpdatePartner={handleUpdatePartner}
-      />
+      <>
+        <AuthPage
+          onSuccess={handleAuthSuccess}
+          onNavigateHome={() => navigateTo('home', '/')}
+          onNavigatePartnerOnboarding={() => navigateTo('partner-with-us', '/partner-with-us')}
+          onNavigateAdmin={() => navigateTo('command-center', '/command-center')}
+          partners={partners}
+          onUpdatePartner={handleUpdatePartner}
+        />
+        <BiometricSetupPromptModal
+          isOpen={showBiometricSetupPrompt}
+          user={pendingBiometricUser}
+          onProceed={handleBiometricSetupProceed}
+          onDismiss={handleBiometricSetupDismiss}
+        />
+      </>
     );
   }
 
@@ -1881,33 +1963,41 @@ export default function App() {
       roles: ['Patient'],
     };
     return (
-      <RoleBasedDashboard
-        currentUser={currentUser || fallbackUser}
-        allPartners={partners}
-        onLogout={handleLogout}
-        onNavigateHome={() => navigateTo('home', '/')}
-        onNavigateBooking={(serviceName) => {
-          navigateTo('home', '/');
-          setTimeout(() => {
-            const el = document.getElementById('services-grid');
-            if (el) el.scrollIntoView({ behavior: 'smooth' });
-          }, 100);
-        }}
-        onSwitchRole={(newRole) => {
-          if (currentUser) {
-            const updated: UserAccount = {
-              ...currentUser,
-              role: newRole,
-              accountType: newRole,
-              roles: Array.from(new Set([...(currentUser.roles || []), newRole])),
-            };
-            setCurrentUser(updated);
-            try {
-              localStorage.setItem('nhealth_user', JSON.stringify(updated));
-            } catch {}
-          }
-        }}
-      />
+      <>
+        <RoleBasedDashboard
+          currentUser={currentUser || fallbackUser}
+          allPartners={partners}
+          onLogout={handleLogout}
+          onNavigateHome={() => navigateTo('home', '/')}
+          onNavigateBooking={(serviceName) => {
+            navigateTo('home', '/');
+            setTimeout(() => {
+              const el = document.getElementById('services-grid');
+              if (el) el.scrollIntoView({ behavior: 'smooth' });
+            }, 100);
+          }}
+          onSwitchRole={(newRole) => {
+            if (currentUser) {
+              const updated: UserAccount = {
+                ...currentUser,
+                role: newRole,
+                accountType: newRole,
+                roles: Array.from(new Set([...(currentUser.roles || []), newRole])),
+              };
+              setCurrentUser(updated);
+              try {
+                localStorage.setItem('nhealth_user', JSON.stringify(updated));
+              } catch {}
+            }
+          }}
+        />
+        <BiometricSetupPromptModal
+          isOpen={showBiometricSetupPrompt}
+          user={pendingBiometricUser}
+          onProceed={handleBiometricSetupProceed}
+          onDismiss={handleBiometricSetupDismiss}
+        />
+      </>
     );
   }
 
@@ -1965,6 +2055,14 @@ export default function App() {
 
         {/* Browser Web Push Permission Prompt */}
         <NotificationPermissionPrompt />
+
+        {/* Post-Login Biometric Setup Prompt */}
+        <BiometricSetupPromptModal
+          isOpen={showBiometricSetupPrompt}
+          user={pendingBiometricUser}
+          onProceed={handleBiometricSetupProceed}
+          onDismiss={handleBiometricSetupDismiss}
+        />
       </>
     );
   }
@@ -2666,29 +2764,8 @@ export default function App() {
           id="home-mobile"
           className="hero-mobile-only relative bg-[#00172b] text-white overflow-hidden border-b border-slate-200/80"
         >
-          {/* Edge-to-Edge Hero Image Container: 100% full screen width, zero side padding/margins, fluid scaling */}
-          <div className="w-full max-w-none p-0 m-0 block">
-            <img
-              src={MOBILE_HERO_IMAGE_URL}
-              alt="Nhealth Healthcare at Home Network Hub"
-              loading="eager"
-              className="w-full max-w-none h-auto block"
-              style={{
-                width: '100%',
-                maxWidth: '100%',
-                height: 'auto',
-                display: 'block',
-                margin: 0,
-                padding: 0
-              }}
-              onError={(e) => {
-                const target = e.currentTarget;
-                if (target.src !== window.location.origin + MOBILE_HERO_IMAGE_FALLBACK) {
-                  target.src = MOBILE_HERO_IMAGE_FALLBACK;
-                }
-              }}
-            />
-          </div>
+          {/* 30:70 Split Hero Layout adhering strictly to a 5:2 aspect ratio */}
+          <MobileHeroSplitCarousel onServiceClick={scrollToServicesGrid} />
 
           {/* Interactive controls, CTA, live counter & accreditation badges */}
           <div className="max-w-xl mx-auto px-4 sm:px-6 pt-4 pb-7 flex flex-col items-center">
@@ -2857,7 +2934,7 @@ export default function App() {
               </div>
               <div className="text-xs font-medium text-slate-300 flex items-center gap-2">
                 <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                <span>Hover to pause · Drag or swipe to explore · Tap/Click to schedule</span>
+                <span>Continuous scroll · Drag or swipe to explore · Tap/Click to schedule</span>
               </div>
             </div>
           </div>
@@ -3166,84 +3243,6 @@ export default function App() {
               </div>
             )}
 
-            {/* Preserved Featured Clinical Specialties & Pillars */}
-            <div className="mt-20 pt-16 border-t border-slate-200/90">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-10 text-left">
-                <div>
-                  <div className="text-xs font-bold uppercase tracking-wider text-[#008080] mb-1">
-                    Specialty Healthcare Packages
-                  </div>
-                  <h3 className="text-2xl font-black text-[#002b49]">
-                    Featured Clinical Programs
-                  </h3>
-                </div>
-                <span className="text-xs text-slate-500 font-medium">
-                  Continuous at-home monitoring &amp; care coordination
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {SERVICES.map((service, index) => {
-                const IconComponent =
-                  index === 0 ? TestTube2 : index === 1 ? Stethoscope : HeartHandshake;
-
-                return (
-                  <div
-                    key={service.id}
-                    className="bg-[#f8fafc] rounded-xl border border-slate-200 overflow-hidden flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-lg group"
-                  >
-                    <div className="relative h-52 bg-slate-200 overflow-hidden">
-                      <img
-                        src={service.image}
-                        alt={service.title}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        referrerPolicy="no-referrer"
-                      />
-                      <div className="absolute top-4 left-4 bg-[#002b49]/90 backdrop-blur-xs text-white p-2 rounded-lg shadow-sm">
-                        <IconComponent className="w-5 h-5 text-teal-300" />
-                      </div>
-                    </div>
-
-                    <div className="p-6 lg:p-7 flex-1 flex flex-col justify-between">
-                      <div>
-                        <div className="text-xs font-semibold text-[#008080] mb-1">
-                          {service.category}
-                        </div>
-                        <h3 className="text-xl font-bold text-[#002b49] mb-3">
-                          {service.title}
-                        </h3>
-                        <p className="text-slate-600 text-sm leading-relaxed mb-5">
-                          {service.description}
-                        </p>
-
-                        <div className="space-y-2 mb-6">
-                          {service.highlights.slice(0, 3).map((item, i) => (
-                            <div key={i} className="flex items-start gap-2.5 text-xs text-slate-700">
-                              <CheckCircle2 className="w-4 h-4 text-[#008080] shrink-0 mt-0.5" />
-                              <span>{item}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="pt-4 border-t border-slate-200/80 flex items-center justify-between gap-3">
-                        <span className="text-xs font-semibold text-slate-500">
-                          {service.turnaround}
-                        </span>
-                        <button
-                          onClick={() => openBookingFor(service.title)}
-                          className="inline-flex items-center gap-1.5 text-xs font-bold text-[#008080] hover:text-[#006666] transition-colors py-1.5 px-3 rounded-md hover:bg-teal-50 cursor-pointer"
-                        >
-                          <span>Book Now</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-              </div>
-            </div>
           </div>
         </section>
 
@@ -4148,7 +4147,7 @@ export default function App() {
             </div>
 
             {/* Login / Signup Switcher */}
-            <div className="flex p-1 bg-slate-100 rounded-xl mb-4">
+            <div className="flex p-1 bg-slate-100 rounded-xl mb-4 gap-1">
               <button
                 type="button"
                 onClick={() => {
@@ -4156,11 +4155,11 @@ export default function App() {
                   setLoginPasskeyMode(false);
                   setLoginSubmitted(false);
                 }}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                className={`flex-1 py-2 text-[11px] sm:text-xs font-bold rounded-lg transition-all cursor-pointer ${
                   loginMode === 'login' && !loginPasskeyMode ? 'bg-white text-[#002b49] shadow-xs' : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                Standard Sign In
+                Standard
               </button>
               <button
                 type="button"
@@ -4168,11 +4167,36 @@ export default function App() {
                   setLoginPasskeyMode(true);
                   setLoginSubmitted(false);
                 }}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                className={`flex-1 py-2 text-[11px] sm:text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1 ${
                   loginPasskeyMode ? 'bg-[#008080] text-white shadow-xs' : 'text-teal-700 hover:text-teal-900'
                 }`}
               >
                 <span>🔑 Passkey</span>
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const res = await authenticateNativeBiometric(loginPhone || undefined);
+                  if (res.success && res.record) {
+                    const bioUser: UserAccount = {
+                      id: res.record.userId,
+                      name: res.record.userName,
+                      phone: res.record.userIdentifier,
+                      accountType: res.record.role || 'Patient & Family Caretaker',
+                    };
+                    setIsLoggedIn(true);
+                    setCurrentUser(bioUser);
+                    setLoginModalOpen(false);
+                    proceedToDashboard(bioUser);
+                  } else {
+                    setLoginPasskeyError(res.error || 'Biometric authentication canceled.');
+                  }
+                }}
+                className="flex-1 py-2 text-[11px] sm:text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1 text-teal-800 hover:text-teal-950 bg-teal-100/60 hover:bg-teal-100"
+                title="Instant Login with Fingerprint or Face ID"
+              >
+                <Fingerprint className="w-3.5 h-3.5 text-[#008080]" />
+                <span>Biometric</span>
               </button>
               <button
                 type="button"
@@ -4181,7 +4205,7 @@ export default function App() {
                   setLoginPasskeyMode(false);
                   setLoginSubmitted(false);
                 }}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                className={`flex-1 py-2 text-[11px] sm:text-xs font-bold rounded-lg transition-all cursor-pointer ${
                   loginMode === 'signup' && !loginPasskeyMode ? 'bg-white text-[#002b49] shadow-xs' : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
@@ -4212,6 +4236,12 @@ export default function App() {
                   onClick={() => {
                     setLoginModalOpen(false);
                     setLoginSubmitted(false);
+                    if (currentUser && !hasBiometricForUser(currentUser.phone || currentUser.email || currentUser.id)) {
+                      setPendingBiometricUser(currentUser);
+                      setShowBiometricSetupPrompt(true);
+                    } else if (currentUser) {
+                      proceedToDashboard(currentUser);
+                    }
                   }}
                   className="w-full bg-[#008080] text-white text-xs font-bold py-2.5 rounded-lg hover:bg-[#006666] transition-colors cursor-pointer mt-2"
                 >
@@ -4323,13 +4353,137 @@ export default function App() {
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  const phoneVal = loginPhone.trim() || '98765 43210';
-                  const nameVal = loginName.trim() || (loginMode === 'signup' ? 'Valued Patient' : 'Registered Patient');
+                  setModalPasswordError('');
+
+                  // 1. REGISTRATION WORKFLOW (Email OTP Trigger)
+                  if (loginMode === 'signup') {
+                    if (!loginUsername.trim()) {
+                      setModalPasswordError('Please enter a username for your account.');
+                      return;
+                    }
+                    if (!loginPassword) {
+                      setModalPasswordError('Password is required.');
+                      return;
+                    }
+                    if (loginPassword.length < 8) {
+                      setModalPasswordError('Password must be at least 8 characters long.');
+                      return;
+                    }
+                    if (!/[A-Za-z]/.test(loginPassword) || !/\d/.test(loginPassword)) {
+                      setModalPasswordError('Password must include both letters and numbers.');
+                      return;
+                    }
+                    if (loginPassword !== loginConfirmPassword) {
+                      setModalPasswordError('Passwords do not match. Please re-enter.');
+                      return;
+                    }
+
+                    const phoneVal = loginPhone.trim() || '9876543210';
+                    const emailVal = loginEmail.trim() || `${loginUsername.trim().toLowerCase()}@example.com`;
+                    const nameVal = loginName.trim() || 'Valued Patient';
+                    const newId = 'PAT-' + Date.now();
+
+                    const userObj: UserAccount = {
+                      id: newId,
+                      name: nameVal,
+                      phone: phoneVal,
+                      email: emailVal,
+                      username: loginUsername.trim().toLowerCase(),
+                      accountType: 'Patient & Family Caretaker',
+                      role: 'Patient',
+                    };
+
+                    const identityObj = {
+                      id: newId,
+                      name: nameVal,
+                      email: emailVal,
+                      phone: phoneVal,
+                      username: loginUsername.trim().toLowerCase(),
+                      password: loginPassword,
+                      role: 'Patient',
+                      roles: ['Patient'],
+                      accountCategory: 'Patient & Family Caretaker',
+                      createdAt: new Date().toISOString(),
+                      lastLoginAt: new Date().toISOString(),
+                    };
+
+                    // Step 1: Automatically generate secure OTP and prompt modal (do not create account yet)
+                    const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
+                    setAppEmailOtpCode(generatedCode);
+                    setPendingQuickSignupUser({ user: userObj, identity: identityObj });
+                    setLoginModalOpen(false);
+                    setAppEmailOtpModalOpen(true);
+                    return;
+                  }
+
+                  // 2. LOGIN WORKFLOW (Username or Email ID + Password)
+                  const identifier = (loginIdentifier.trim() || loginPhone.trim()).toLowerCase();
+                  if (!identifier) {
+                    setModalPasswordError('Please enter your Username or Registered Email ID.');
+                    return;
+                  }
+                  if (!loginPassword.trim()) {
+                    setModalPasswordError('Please enter your password.');
+                    return;
+                  }
+
+                  // Look up user from stored identities
+                  let matchedUser: any = null;
+                  try {
+                    const raw = localStorage.getItem('nhealth_identities');
+                    const list: any[] = raw ? JSON.parse(raw) : [];
+                    const cleanPhone = identifier.replace(/\D/g, '');
+                    matchedUser = list.find((u) => {
+                      const uUser = (u.username || '').toLowerCase();
+                      const uEmail = (u.email || '').toLowerCase();
+                      const uPhone = (u.phone || '').replace(/\D/g, '');
+                      return (
+                        uUser === identifier ||
+                        uEmail === identifier ||
+                        (cleanPhone && cleanPhone.length >= 7 && uPhone.includes(cleanPhone))
+                      );
+                    });
+                  } catch {}
+
+                  // Fallback demo users check if not found in custom list
+                  if (!matchedUser) {
+                    if (identifier === 'rameshkumar' || identifier === 'ramesh.kumar@example.com' || identifier === '9876543210') {
+                      matchedUser = {
+                        id: 'PAT-101',
+                        name: 'Ramesh Kumar',
+                        email: 'ramesh.kumar@example.com',
+                        phone: '+91 98765 43210',
+                        username: 'rameshkumar',
+                        password: 'Password@123',
+                        role: 'Patient',
+                      };
+                    } else if (identifier === 'ananyasharma' || identifier === 'ananya.sharma@example.com' || identifier === '9876543211') {
+                      matchedUser = {
+                        id: 'PAT-102',
+                        name: 'Ananya Sharma',
+                        email: 'ananya.sharma@example.com',
+                        phone: '+91 98765 43211',
+                        username: 'ananyasharma',
+                        password: 'Password@123',
+                        role: 'Patient',
+                      };
+                    }
+                  }
+
+                  // Verify password
+                  if (matchedUser && matchedUser.password && matchedUser.password !== loginPassword) {
+                    setModalPasswordError('Incorrect password. Please verify your credentials or use Forgot Password.');
+                    return;
+                  }
+
                   const userObj: UserAccount = {
-                    id: 'USER-' + Date.now(),
-                    name: nameVal,
-                    phone: phoneVal,
-                    accountType: 'Patient & Family Caretaker',
+                    id: matchedUser ? matchedUser.id : 'USER-' + Date.now(),
+                    name: matchedUser ? matchedUser.name : (loginName.trim() || 'Registered Patient'),
+                    phone: matchedUser ? matchedUser.phone : (loginPhone.trim() || '98765 43210'),
+                    email: matchedUser ? matchedUser.email : (identifier.includes('@') ? identifier : undefined),
+                    username: matchedUser ? matchedUser.username : (!identifier.includes('@') ? identifier : undefined),
+                    accountType: matchedUser?.role === 'Partner' ? 'Diagnostic Laboratory Partner' : 'Patient & Family Caretaker',
+                    role: matchedUser?.role || 'Patient',
                   };
 
                   setIsLoggedIn(true);
@@ -4347,60 +4501,195 @@ export default function App() {
                     setLoginSubmitted(true);
                   }
                 }}
-                className="space-y-4"
+                className="space-y-3.5"
               >
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Mobile Number (for instant OTP verification) <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-3 text-xs font-semibold text-slate-400">+91</span>
-                    <input
-                      type="tel"
-                      required
-                      placeholder="98765 43210"
-                      value={loginPhone}
-                      onChange={(e) => setLoginPhone(e.target.value)}
-                      className="w-full pl-12 pr-4 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#008080]"
-                    />
+                {modalPasswordError && (
+                  <div className="p-2.5 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs flex items-center gap-1.5">
+                    <span className="font-bold">Error:</span> {modalPasswordError}
                   </div>
-                </div>
+                )}
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Full Name {loginMode === 'signup' && <span className="text-red-500">*</span>}
-                  </label>
-                  <input
-                    type="text"
-                    required={loginMode === 'signup'}
-                    placeholder="Patient or Caretaker Name"
-                    value={loginName}
-                    onChange={(e) => setLoginName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#008080]"
-                  />
-                </div>
+                {loginMode === 'signup' ? (
+                  /* SIGNUP FIELDS */
+                  <>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Full Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Rahul Verma"
+                        value={loginName}
+                        onChange={(e) => setLoginName(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#008080]"
+                      />
+                    </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Account Category
-                  </label>
-                  <select className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#008080] bg-white font-medium text-slate-800">
-                    <option>Patient &amp; Family Caretaker</option>
-                    <option>Doctor / Certified Clinician</option>
-                    <option>Diagnostic Laboratory Partner</option>
-                    <option>Hospital OPD Coordinator</option>
-                  </select>
-                </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Choose Username <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. rahulverma"
+                        value={loginUsername}
+                        onChange={(e) => setLoginUsername(e.target.value.toLowerCase().replace(/\s+/g, ''))}
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#008080]"
+                      />
+                      <p className="text-[10px] text-slate-400 mt-0.5">Can be used interchangeably with your email for login.</p>
+                    </div>
 
-                <div className="flex justify-end pt-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setLoginRecoveryModalOpen(true)}
-                    className="text-xs font-bold text-[#008080] hover:underline cursor-pointer"
-                  >
-                    Forgot Username / Password?
-                  </button>
-                </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Mobile Number <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-2.5 text-xs font-semibold text-slate-400">+91</span>
+                        <input
+                          type="tel"
+                          required
+                          placeholder="98765 43210"
+                          value={loginPhone}
+                          onChange={(e) => setLoginPhone(e.target.value)}
+                          className="w-full pl-12 pr-4 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#008080]"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Email Address <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        placeholder="rahul.verma@example.com"
+                        value={loginEmail}
+                        onChange={(e) => setLoginEmail(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#008080]"
+                      />
+                    </div>
+
+                    {/* MANDATORY PASSWORD & CONFIRM PASSWORD */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Password <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showModalPassword ? 'text' : 'password'}
+                          required
+                          placeholder="Min. 8 chars, letters & numbers"
+                          value={loginPassword}
+                          onChange={(e) => setLoginPassword(e.target.value)}
+                          className="w-full px-3.5 py-2.5 pr-10 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#008080]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowModalPassword(!showModalPassword)}
+                          className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                          {showModalPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        Must contain at least 8 characters, with letters and numbers.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Confirm Password <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showModalConfirmPassword ? 'text' : 'password'}
+                          required
+                          placeholder="Re-enter your password"
+                          value={loginConfirmPassword}
+                          onChange={(e) => setLoginConfirmPassword(e.target.value)}
+                          className={`w-full px-3.5 py-2.5 pr-10 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-[#008080] ${
+                            loginConfirmPassword && loginConfirmPassword !== loginPassword
+                              ? 'border-red-400 bg-red-50/30'
+                              : loginConfirmPassword && loginConfirmPassword === loginPassword
+                              ? 'border-emerald-500 bg-emerald-50/30'
+                              : 'border-slate-300'
+                          }`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowModalConfirmPassword(!showModalConfirmPassword)}
+                          className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                          {showModalConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      {loginConfirmPassword && loginConfirmPassword !== loginPassword && (
+                        <p className="text-[11px] text-red-500 mt-1">Passwords do not match</p>
+                      )}
+                      {loginConfirmPassword && loginConfirmPassword === loginPassword && (
+                        <p className="text-[11px] text-emerald-600 font-semibold mt-1">✓ Passwords match</p>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  /* LOGIN FIELDS (USERNAME / EMAIL + PASSWORD) */
+                  <>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Username or Registered Email ID <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Enter username or email ID"
+                        value={loginIdentifier}
+                        onChange={(e) => setLoginIdentifier(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#008080]"
+                      />
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        Demo: <span className="font-mono text-slate-600">rameshkumar</span> or <span className="font-mono text-slate-600">ramesh.kumar@example.com</span>
+                      </p>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-bold text-slate-700">
+                          Password <span className="text-red-500">*</span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setLoginRecoveryModalOpen(true)}
+                          className="text-xs font-bold text-[#008080] hover:underline cursor-pointer"
+                        >
+                          Forgot Password?
+                        </button>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type={showModalPassword ? 'text' : 'password'}
+                          required
+                          placeholder="Enter your password"
+                          value={loginPassword}
+                          onChange={(e) => setLoginPassword(e.target.value)}
+                          className="w-full px-3.5 py-2.5 pr-10 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#008080]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowModalPassword(!showModalPassword)}
+                          className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                          {showModalPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        Demo password: <span className="font-mono text-slate-600">Password@123</span>
+                      </p>
+                    </div>
+                  </>
+                )}
 
                 <button
                   type="submit"
@@ -4410,7 +4699,7 @@ export default function App() {
                     ? 'Login & Confirm Booking'
                     : loginMode === 'login'
                     ? 'Sign In to Health Portal'
-                    : 'Complete Registration'}
+                    : 'Create Patient Account'}
                 </button>
 
                 <p className="text-center text-[11px] text-slate-400 pt-1">
@@ -5070,6 +5359,25 @@ export default function App() {
           <span>Press Back again to exit</span>
         </div>
       )}
+
+      {/* Email OTP Verification Modal for Quick Patient Registration */}
+      <EmailOtpVerificationModal
+        isOpen={appEmailOtpModalOpen}
+        email={pendingQuickSignupUser?.user.email || loginEmail || 'patient@example.com'}
+        userType="Patient"
+        generatedOtp={appEmailOtpCode}
+        onVerifySuccess={handleAppEmailOtpSuccess}
+        onResendOtp={handleResendAppEmailOtp}
+        onClose={() => setAppEmailOtpModalOpen(false)}
+      />
+
+      {/* Post-Login Biometric Setup Prompt Modal */}
+      <BiometricSetupPromptModal
+        isOpen={showBiometricSetupPrompt}
+        user={pendingBiometricUser}
+        onProceed={handleBiometricSetupProceed}
+        onDismiss={handleBiometricSetupDismiss}
+      />
     </div>
   );
 }

@@ -101,9 +101,9 @@ export const DEFAULT_MARQUEE_SERVICES: MarqueeServiceItem[] = [
   {
     id: 'pharmacy',
     name: 'Pharmacy Delivery',
-    directUrl: 'https://i.ibb.co/N6DZSZ9q/Pharmacy-to-home.png',
+    directUrl: 'https://i.ibb.co/7NgLgBCz/Pharmacy-to-home.png',
     localFile: '/Pharmacy%20to%20home.png',
-    pageUrl: 'https://ibb.co/4ZvPdP8L',
+    pageUrl: 'https://ibb.co/wrJjJ8gL',
     tagline: 'Direct Temperature-Controlled Medicines',
     category: 'Pharmacy',
     iconName: 'Pill',
@@ -135,8 +135,29 @@ export const getStoredMarqueeServices = (): MarqueeServiceItem[] => {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_MARQUEE_SERVICES));
       return DEFAULT_MARQUEE_SERVICES;
     }
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_MARQUEE_SERVICES;
+    let parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      let needsUpdate = false;
+      parsed = parsed.map((item: MarqueeServiceItem) => {
+        if (item.id === 'pharmacy' || item.name === 'Pharmacy Delivery') {
+          if (item.pageUrl !== 'https://ibb.co/wrJjJ8gL' || !item.directUrl.includes('7NgLgBCz')) {
+            needsUpdate = true;
+            return {
+              ...item,
+              pageUrl: 'https://ibb.co/wrJjJ8gL',
+              directUrl: 'https://i.ibb.co/7NgLgBCz/Pharmacy-to-home.png',
+              localFile: '/Pharmacy%20to%20home.png',
+            };
+          }
+        }
+        return item;
+      });
+      if (needsUpdate) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+      }
+      return parsed;
+    }
+    return DEFAULT_MARQUEE_SERVICES;
   } catch {
     return DEFAULT_MARQUEE_SERVICES;
   }
