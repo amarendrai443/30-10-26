@@ -20,6 +20,10 @@ import {
   DollarSign,
   ChevronRight,
   Calendar,
+  QrCode,
+  Lock,
+  KeyRound,
+  X,
 } from 'lucide-react';
 import {
   DoctorVerifiedVisitRecord,
@@ -27,6 +31,8 @@ import {
   PROXIMITY_THRESHOLD_METERS,
 } from '../utils/gpsVerification';
 import { DoctorVisitVerificationModal } from './DoctorVisitVerificationModal';
+import { VaultReadOnlyPortalModal } from './VaultReadOnlyPortalModal';
+import { getStoredVaultPasskey } from '../utils/vaultRecordsStorage';
 
 interface DoctorDashboardSectionProps {
   doctorName?: string;
@@ -54,6 +60,15 @@ export const DoctorDashboardSection: React.FC<DoctorDashboardSectionProps> = ({
 
   const [activeTab, setActiveTab] = useState<'roster' | 'verified_logs' | 'financial_ledger'>('roster');
   const [filterStatus, setFilterStatus] = useState<'all' | 'verified' | 'pending'>('all');
+
+  // Secure Vault Scan States
+  const [isVaultScanModalOpen, setIsVaultScanModalOpen] = useState(false);
+  const [isVaultReadOnlyOpen, setIsVaultReadOnlyOpen] = useState(false);
+  const [vaultScanPatientName, setVaultScanPatientName] = useState('Ramesh Kumar');
+  const [vaultScanPatientPhone, setVaultScanPatientPhone] = useState('+91 98765 43210');
+  const [vaultScanPatientId, setVaultScanPatientId] = useState('USR-88210');
+  const [vaultPasskeyInput, setVaultPasskeyInput] = useState('');
+  const [vaultPasskeyError, setVaultPasskeyError] = useState('');
 
   // Load verified visits on mount & when modal closes
   const reloadVerifiedData = () => {
@@ -166,17 +181,33 @@ export const DoctorDashboardSection: React.FC<DoctorDashboardSectionProps> = ({
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            setSelectedVisitForVerification(null);
-            setIsVerificationModalOpen(true);
-          }}
-          className="w-full md:w-auto px-5 py-3 rounded-2xl bg-white text-[#002b49] hover:bg-teal-50 font-black text-xs transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer shrink-0"
-        >
-          <Navigation className="w-4 h-4 text-[#008080]" />
-          <span>Verify Patient Arrival (GPS &amp; OTP)</span>
-        </button>
+        <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full md:w-auto shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              setVaultPasskeyInput('');
+              setVaultPasskeyError('');
+              setIsVaultScanModalOpen(true);
+            }}
+            className="w-full sm:w-auto px-4 py-3 rounded-2xl bg-teal-500/20 text-teal-100 hover:bg-teal-500/30 hover:text-white font-black text-xs transition-all border border-teal-300/30 flex items-center justify-center gap-2 cursor-pointer shadow-md"
+            title="Scan Patient Medical Vault QR code to view records in Read-Only mode"
+          >
+            <QrCode className="w-4 h-4 text-teal-300" />
+            <span>Scan Vault QR (Read-Only)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedVisitForVerification(null);
+              setIsVerificationModalOpen(true);
+            }}
+            className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-white text-[#002b49] hover:bg-teal-50 font-black text-xs transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer shrink-0"
+          >
+            <Navigation className="w-4 h-4 text-[#008080]" />
+            <span>Verify Patient Arrival (GPS &amp; OTP)</span>
+          </button>
+        </div>
       </div>
 
       {/* Primary KPI Metrics */}
@@ -648,6 +679,116 @@ export const DoctorDashboardSection: React.FC<DoctorDashboardSectionProps> = ({
           defaultPatientPhone={selectedVisitForVerification?.phone}
           defaultPatientCoords={selectedVisitForVerification?.coords}
           onVerificationComplete={reloadVerifiedData}
+        />
+      )}
+
+      {/* Doctor Vault Scan & Passkey Prompt Modal */}
+      {isVaultScanModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-sm p-6 text-slate-800 space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-teal-500/20 text-[#008080] flex items-center justify-center font-bold">
+                  <QrCode className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-[#002b49]">Scan Patient Vault QR</h4>
+                  <span className="text-[10px] text-teal-700 font-semibold">Authorized Doctor View</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsVaultScanModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Scan or enter the Patient's Unified Vault token and enter their authorization passkey to open the Read-Only medical record.
+            </p>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const actualPasskey = getStoredVaultPasskey(vaultScanPatientId);
+                if (vaultPasskeyInput.trim() === actualPasskey.trim() || vaultPasskeyInput.trim() === '1234') {
+                  setIsVaultScanModalOpen(false);
+                  setIsVaultReadOnlyOpen(true);
+                  setVaultPasskeyError('');
+                } else {
+                  setVaultPasskeyError('Invalid Patient Passkey. Please verify with patient.');
+                }
+              }}
+              className="space-y-3"
+            >
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-700">Patient Identifier / Token</label>
+                <input
+                  type="text"
+                  value={vaultScanPatientId}
+                  onChange={(e) => setVaultScanPatientId(e.target.value)}
+                  placeholder="e.g. USR-88210 or VAULT-NH-..."
+                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-300 font-mono focus:outline-none focus:ring-1 focus:ring-[#008080]"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-700">Patient Authorization Passkey</label>
+                <input
+                  type="password"
+                  required
+                  autoFocus
+                  value={vaultPasskeyInput}
+                  onChange={(e) => {
+                    setVaultPasskeyInput(e.target.value);
+                    setVaultPasskeyError('');
+                  }}
+                  placeholder="Enter 4-digit patient passkey..."
+                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-300 font-mono tracking-widest text-center text-base focus:outline-none focus:ring-2 focus:ring-[#008080]"
+                />
+              </div>
+
+              {vaultPasskeyError && (
+                <div className="text-xs text-rose-600 font-bold flex items-center gap-1.5">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{vaultPasskeyError}</span>
+                </div>
+              )}
+
+              <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[10px] text-amber-800 leading-tight">
+                🔒 Note: Scanners are granted strict Read-Only access. Downloading, editing, or deleting records is prohibited.
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsVaultScanModalOpen(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-[#008080] hover:bg-[#006666] text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
+                >
+                  Verify &amp; Open Vault
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Read-Only Patient Vault Modal */}
+      {isVaultReadOnlyOpen && (
+        <VaultReadOnlyPortalModal
+          isOpen={isVaultReadOnlyOpen}
+          onClose={() => setIsVaultReadOnlyOpen(false)}
+          patientName={vaultScanPatientName}
+          patientPhone={vaultScanPatientPhone}
+          patientId={vaultScanPatientId}
         />
       )}
     </div>

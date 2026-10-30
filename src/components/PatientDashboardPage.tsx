@@ -59,6 +59,8 @@ import { getStoredPromotions, PromotionItem } from '../utils/promotionsStorage';
 import { usePatientInactivityRefresh } from '../hooks/usePatientInactivityRefresh';
 import { UserNotificationCenter } from './UserNotificationCenter';
 import { SecureQrTokenCard } from './SecureQrTokenCard';
+import { UnifiedVaultQrCard } from './UnifiedVaultQrCard';
+import { getStoredVaultRecords, UnifiedVaultRecord } from '../utils/vaultRecordsStorage';
 import { SecureHealthToken } from '../types/secureToken';
 import {
   findTokenById,
@@ -2837,16 +2839,24 @@ export const PatientDashboardPage: React.FC<PatientDashboardPageProps> = ({
             </div>
           )}
 
-          {/* TAB: MY RECORDS */}
+          {/* TAB: MY RECORDS VAULT */}
           {activeTab === 'records' && (
             <div className="space-y-6 animate-fade-in">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              {/* 1. Unified Vault QR Code with Patient-Defined Passkey Protection */}
+              <UnifiedVaultQrCard
+                patientId={currentUser?.id || 'USR-88210'}
+                patientName={patientName}
+                patientPhone={patientPhone}
+                isDark={isDark}
+              />
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
                 <div>
                   <h3 className={`text-xl font-black ${isDark ? 'text-white' : 'text-[#002b49]'}`}>
                     Digital Health Vault &amp; Medical Records
                   </h3>
                   <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Secure, tamper-proof repository of your lab reports, prescriptions &amp; clinical summaries.
+                    Tamper-proof repository of your discharge summaries, diagnostic lab reports, prescriptions &amp; clinical summaries.
                   </p>
                 </div>
                 <button
@@ -2859,47 +2869,18 @@ export const PatientDashboardPage: React.FC<PatientDashboardPageProps> = ({
                 </button>
               </div>
 
-              {/* Records List */}
+              {/* Records List from Unified Vault Registry */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[
-                  {
-                    title: 'Complete Blood Count & Comprehensive Lipid Profile',
-                    category: 'Diagnostic Lab Report',
-                    date: '18 Oct 2026',
-                    provider: 'Apollo Diagnostics (NABL Accredited)',
-                    size: '1.4 MB PDF',
-                  },
-                  {
-                    title: 'Cardiology Consultation Summary & ECG Analysis',
-                    category: 'Doctor Prescription',
-                    date: '12 Oct 2026',
-                    provider: 'Dr. Arvind Swaminathan (Senior Cardiologist)',
-                    size: '890 KB PDF',
-                  },
-                  {
-                    title: 'Optical Facial Photoplethysmography (vPPG) Report',
-                    category: 'Vital Lens Biometrics',
-                    date: '10 Oct 2026',
-                    provider: 'Nhealth Vital Lens™ Clinical Engine',
-                    size: '420 KB PDF',
-                  },
-                  {
-                    title: 'HbA1c & Fasting Blood Sugar Home Sample Report',
-                    category: 'Pathology Report',
-                    date: '28 Sep 2026',
-                    provider: 'Lucid Medical Diagnostics (NABL Certified)',
-                    size: '1.1 MB PDF',
-                  },
-                ].map((rec, i) => (
+                {getStoredVaultRecords(currentUser?.id || 'USR-88210').map((rec) => (
                   <div
-                    key={i}
+                    key={rec.id}
                     className={`p-4 sm:p-5 rounded-2xl border shadow-xs space-y-3 ${
                       isDark ? 'bg-[#00172d] border-cyan-900/40 text-white' : 'bg-white border-slate-200 text-slate-800'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-9 h-9 rounded-xl bg-teal-500/20 text-teal-500 flex items-center justify-center shrink-0">
+                        <div className="w-9 h-9 rounded-xl bg-teal-500/20 text-[#008080] dark:text-cyan-400 flex items-center justify-center shrink-0">
                           <FileText className="w-5 h-5" />
                         </div>
                         <div>
@@ -2911,14 +2892,18 @@ export const PatientDashboardPage: React.FC<PatientDashboardPageProps> = ({
                       </div>
                     </div>
 
+                    <p className={`text-xs line-clamp-2 leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                      {rec.summary}
+                    </p>
+
                     <div className="space-y-1 text-xs border-y py-2.5 border-slate-200 dark:border-slate-800">
                       <div className="flex justify-between">
                         <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Issued By:</span>
-                        <span className="font-semibold text-right">{rec.provider}</span>
+                        <span className="font-semibold text-right truncate max-w-[200px]">{rec.issuedBy}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Date &amp; Size:</span>
-                        <span className="font-mono">{rec.date} • {rec.size}</span>
+                        <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Facility &amp; Date:</span>
+                        <span className="font-mono">{rec.date} • {rec.facility}</span>
                       </div>
                     </div>
 
@@ -2929,7 +2914,7 @@ export const PatientDashboardPage: React.FC<PatientDashboardPageProps> = ({
                           if (storedScans.length > 0) {
                             handleDownloadVitalPDF(storedScans[0]);
                           } else {
-                            alert('Downloading verified clinical document from secure Nhealth cloud...');
+                            alert(`Downloading encrypted ${rec.category} record #${rec.id} for patient archive...`);
                           }
                         }}
                         className="flex-1 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
@@ -2939,10 +2924,11 @@ export const PatientDashboardPage: React.FC<PatientDashboardPageProps> = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => alert(`Opening secure digital viewer for: ${rec.title}`)}
+                        onClick={() => alert(`Clinical Summary (${rec.title}):\n\n${rec.summary}\n\nIssued by: ${rec.issuedBy} (${rec.facility})\nDate: ${rec.date}`)}
                         className={`px-3 py-2 rounded-xl border text-xs font-semibold cursor-pointer ${
                           isDark ? 'border-cyan-800 hover:bg-white/5 text-cyan-300' : 'border-slate-200 hover:bg-slate-100 text-slate-700'
                         }`}
+                        title="View Clinical Summary"
                       >
                         <Eye className="w-3.5 h-3.5" />
                       </button>

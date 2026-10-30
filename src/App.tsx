@@ -2325,45 +2325,6 @@ export default function App() {
                   Global Concierge
                 </span>
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  navigateTo('partners', '/partners');
-                }}
-                className="w-full text-left text-sm font-semibold text-slate-800 hover:text-[#008080] py-1.5 cursor-pointer flex items-center justify-between"
-              >
-                <span>Our Healthcare &amp; Diagnostic Partners</span>
-                <span className="text-[10px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200">
-                  Verified Network
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  navigateTo('insurer', '/insurer-panel');
-                }}
-                className="w-full text-left text-sm font-semibold text-slate-800 hover:text-[#008080] py-1.5 cursor-pointer flex items-center justify-between"
-              >
-                <span>Insurer TPA Panel</span>
-                <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
-                  Claims Audit
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  navigateTo('api-gateway', '/partner-api');
-                }}
-                className="w-full text-left text-sm font-semibold text-slate-800 hover:text-[#008080] py-1.5 cursor-pointer flex items-center justify-between"
-              >
-                <span>Partner API Gateway</span>
-                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                  REST &amp; HMAC
-                </span>
-              </button>
               <a
                 href="#contact"
                 onClick={() => setMobileMenuOpen(false)}
