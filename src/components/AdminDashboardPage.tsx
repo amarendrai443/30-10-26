@@ -1358,26 +1358,39 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
       )}
 
       {/* Top Admin Console Navbar */}
-      <nav className="bg-[#00172b] text-white border-b border-slate-800 sticky top-0 z-40 shadow-md">
+      <nav className="bg-[#00172b] text-white border-b border-slate-800 sticky top-0 z-50 shadow-md">
         <div className="w-full px-4 sm:px-8 lg:px-12 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={onNavigateHome}
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.history.length > 1) {
+                  window.history.back();
+                } else {
+                  onNavigateHome();
+                }
+              }}
               className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-300 hover:text-white px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition-all cursor-pointer"
+              title="Back strictly one step"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Back to Patient Portal</span>
+              <span>Back</span>
             </button>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <a
+            href="https://ibb.co/SDYB7XbW"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2.5 hover:opacity-95"
+            title="Official Nhealth Logo"
+          >
             <img
-              src="https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
+              src="https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
               alt="Nhealth Logo"
               className="h-9 w-auto object-contain rounded-lg border border-teal-500/30 shrink-0"
               onError={(e) => {
-                e.currentTarget.src = 'https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
+                e.currentTarget.src = 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
               }}
             />
             <div>
@@ -1393,7 +1406,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                 Inactivity Suspensions • Fraud Warning Flags • Live Partner Credentialing
               </span>
             </div>
-          </div>
+          </a>
 
           <div className="flex items-center gap-2.5">
             <button

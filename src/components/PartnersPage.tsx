@@ -87,7 +87,7 @@ export const PartnersPage: React.FC<PartnersPageProps> = ({
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col text-slate-800">
       {/* Top Header with One-Step Back Navigation */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <button
@@ -102,11 +102,20 @@ export const PartnersPage: React.FC<PartnersPageProps> = ({
 
             <div className="h-6 w-px bg-slate-200 hidden xs:block" />
 
-            <div className="flex items-center gap-2">
+            <a
+              href="https://ibb.co/SDYB7XbW"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 hover:opacity-95"
+              title="Official Nhealth Logo"
+            >
               <img
-                src="https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
+                src="https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
                 alt="Nhealth Logo"
                 className="w-7 h-7 sm:w-8 sm:h-8 object-contain"
+                onError={(e) => {
+                  e.currentTarget.src = 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
+                }}
               />
               <div>
                 <span className="font-extrabold text-lg sm:text-xl text-[#002b49] tracking-tight">
@@ -116,7 +125,7 @@ export const PartnersPage: React.FC<PartnersPageProps> = ({
                   Partner Network
                 </span>
               </div>
-            </div>
+            </a>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">

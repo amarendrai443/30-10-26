@@ -296,7 +296,7 @@ export const RoleBasedDashboard: React.FC<RoleBasedDashboardProps> = ({
       )}
 
       {/* Top Console Navigation Bar */}
-      <nav className="bg-[#00172b] text-white border-b border-slate-800 sticky top-0 z-40 shadow-md">
+      <nav className="bg-[#00172b] text-white border-b border-slate-800 sticky top-0 z-50 shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-3">
           {/* Brand & Home */}
           <div className="flex items-center gap-3 shrink-0">
@@ -307,11 +307,11 @@ export const RoleBasedDashboard: React.FC<RoleBasedDashboardProps> = ({
               title="Return to Public Healthcare Portal"
             >
               <img
-                src="https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
+                src="https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
                 alt="Nhealth Logo"
                 className="h-9 w-auto object-contain rounded-lg border border-teal-500/30"
                 onError={(e) => {
-                  e.currentTarget.src = 'https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
+                  e.currentTarget.src = 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
                 }}
               />
               <div className="flex flex-col text-left">

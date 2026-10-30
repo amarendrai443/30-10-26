@@ -195,28 +195,46 @@ export const CorporateEnquiriesPage: React.FC<CorporateEnquiriesPageProps> = ({
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-[#008080]/15 selection:text-[#002b49]">
       {/* Top Corporate Header */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs">
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between">
-          {/* Mobile & Tablet Header (ONLY Nhealth Logo & Name left-aligned, Hamburger Icon right-aligned) */}
-          <div className="flex lg:hidden items-center justify-between w-full">
-            <button
-              type="button"
-              onClick={onNavigateHome}
-              className="flex items-center gap-2.5 focus:outline-hidden text-left cursor-pointer"
-              title="Return to Nhealth Home"
-            >
-              <img
-                src="https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
-                alt="Nhealth Logo"
-                className="w-8 h-8 sm:w-9 sm:h-9 object-contain"
-                onError={(e) => {
-                  e.currentTarget.src = 'https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
+          {/* Mobile & Tablet Header (Back button, Nhealth Logo, and Hamburger Icon) */}
+          <div className="flex lg:hidden items-center justify-between w-full gap-2">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window !== 'undefined' && window.history.length > 1) {
+                    window.history.back();
+                  } else {
+                    onNavigateHome();
+                  }
                 }}
-              />
-              <span className="font-black text-xl sm:text-2xl text-[#002b49] tracking-tight">
-                Nhealth<span className="text-[#008080]">™</span>
-              </span>
-            </button>
+                className="p-1.5 rounded-lg text-slate-700 hover:text-[#008080] hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200"
+                title="Back strictly one step"
+                aria-label="Back"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+              <a
+                href="https://ibb.co/SDYB7XbW"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 focus:outline-hidden text-left cursor-pointer hover:opacity-95"
+                title="Official Nhealth Logo"
+              >
+                <img
+                  src="https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
+                  alt="Nhealth Logo"
+                  className="w-8 h-8 sm:w-9 sm:h-9 object-contain"
+                  onError={(e) => {
+                    e.currentTarget.src = 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
+                  }}
+                />
+                <span className="font-black text-xl sm:text-2xl text-[#002b49] tracking-tight">
+                  Nhealth<span className="text-[#008080]">™</span>
+                </span>
+              </a>
+            </div>
 
             <button
               type="button"
@@ -233,18 +251,28 @@ export const CorporateEnquiriesPage: React.FC<CorporateEnquiriesPageProps> = ({
             <div className="flex items-center gap-4">
               <button
                 type="button"
-                onClick={onNavigateHome}
+                onClick={() => {
+                  if (typeof window !== 'undefined' && window.history.length > 1) {
+                    window.history.back();
+                  } else {
+                    onNavigateHome();
+                  }
+                }}
                 className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-[#008080] transition-colors p-1.5 -ml-1.5 rounded-lg hover:bg-slate-100 cursor-pointer"
+                title="Back strictly one step"
               >
                 <ArrowLeft className="w-4 h-4" />
-                <span>Back to Patient Portal</span>
+                <span>Back</span>
               </button>
 
               <div className="h-6 w-px bg-slate-200" />
 
               <div className="flex items-center gap-2">
                 <img
-                  src="https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
+                  src="https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
+                  onError={(e) => {
+                    e.currentTarget.src = 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
+                  }}
                   alt="Nhealth Logo"
                   className="w-7 h-7 object-contain"
                 />

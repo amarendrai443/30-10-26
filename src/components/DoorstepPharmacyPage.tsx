@@ -39,6 +39,7 @@ import {
   ChevronRight,
   ExternalLink,
   Coins,
+  Menu,
 } from 'lucide-react';
 import {
   PHARMACY_CATEGORIES,
@@ -106,6 +107,7 @@ export const DoorstepPharmacyPage: React.FC<DoorstepPharmacyPageProps> = ({
   const [selectedQrToken, setSelectedQrToken] = useState<SecureHealthToken | null>(null);
   const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
   const [scannerPrefilledTokenId, setScannerPrefilledTokenId] = useState('');
+  const [isPharmacyMenuOpen, setIsPharmacyMenuOpen] = useState(false);
 
   // Notifications State
   const [notifications, setNotifications] = useState<PharmacyNotificationItem[]>(() => {
@@ -593,93 +595,36 @@ export const DoorstepPharmacyPage: React.FC<DoorstepPharmacyPageProps> = ({
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
       {/* 1. TOP CORPORATE DARK BLUE HEADER & NAVIGATION */}
-      <header className="sticky top-0 z-40 bg-[#002b49] text-white shadow-md border-b border-[#003e6b]">
+      <header className="sticky top-0 z-50 bg-[#002b49] text-white shadow-md border-b border-[#003e6b]">
         <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-3">
+          {/* Left: Official Nhealth Logo & Title "Doorstep Pharmacy" ONLY */}
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                if (typeof window !== 'undefined' && window.history.length > 1) {
-                  window.history.back();
-                } else {
-                  onBackToHome();
-                }
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#001d31] hover:bg-[#003e6b] text-teal-300 text-xs sm:text-sm font-semibold transition-all border border-teal-500/20 active:scale-95 cursor-pointer"
+            <a
+              href="https://ibb.co/SDYB7XbW"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center shrink-0 hover:opacity-90 transition-opacity"
+              title="Official Nhealth Logo"
             >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Back</span>
-            </button>
-            <div className="h-5 w-px bg-slate-700 hidden sm:block" />
-            <div className="flex items-center gap-2">
-              <span className="p-1.5 rounded-lg bg-teal-500/20 text-teal-300">
-                <Pill className="w-5 h-5 text-teal-300" />
-              </span>
-              <div>
-                <h1 className="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2">
-                  <span>Doorstep Pharmacy</span>
-                  <span className="hidden sm:inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 font-medium border border-teal-400/30">
-                    <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
-                    Express 2–4 Hr Delivery
-                  </span>
-                </h1>
-                <p className="text-[11px] text-slate-300 hidden md:block">
-                  100% Genuine Medicines · Temperature-Controlled Transport · Pharmacist Verified
-                </p>
-              </div>
-            </div>
+              <img
+                src="https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
+                alt="Nhealth Official Logo"
+                className="h-8 sm:h-9 w-auto object-contain shrink-0"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (target.src !== 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png') {
+                    target.src = 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
+                  }
+                }}
+              />
+            </a>
+            <h1 className="text-base sm:text-lg font-bold tracking-tight text-white whitespace-nowrap">
+              Doorstep Pharmacy
+            </h1>
           </div>
 
-          {/* Right Header Navigation Actions */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/* 4 Main View Switcher Tabs */}
-            <div className="flex items-center bg-[#001d31] p-1 rounded-xl border border-teal-500/20 text-xs">
-              <button
-                onClick={() => setActiveView('catalog')}
-                className={`px-2.5 sm:px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                  activeView === 'catalog'
-                    ? 'bg-[#008080] text-white shadow-xs'
-                    : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                Medicines
-              </button>
-              <button
-                onClick={() => setActiveView('deals')}
-                className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                  activeView === 'deals'
-                    ? 'bg-[#008080] text-white shadow-xs'
-                    : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                <Tag className="w-3.5 h-3.5 text-amber-400" />
-                <span className="hidden xs:inline">Deals</span>
-              </button>
-              <button
-                onClick={() => setActiveView('wallet')}
-                className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                  activeView === 'wallet'
-                    ? 'bg-[#008080] text-white shadow-xs'
-                    : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                <Gift className="w-3.5 h-3.5 text-teal-300" />
-                <span className="hidden xs:inline">Rewards</span>
-              </button>
-              <button
-                onClick={() => setActiveView('orders')}
-                className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                  activeView === 'orders'
-                    ? 'bg-[#008080] text-white shadow-xs'
-                    : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                <span>Orders</span>
-                {orders.some((o) => o.deliveryStatus !== 'Delivered') && (
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                )}
-              </button>
-            </div>
-
+          {/* Right Header Navigation: Notification icon, Cart icon, and Dedicated Hamburger Menu */}
+          <div className="flex items-center gap-2 sm:gap-2.5">
             {/* Notification Inbox Bell Button */}
             <button
               onClick={() => setIsNotificationsOpen(true)}
@@ -687,7 +632,7 @@ export const DoorstepPharmacyPage: React.FC<DoorstepPharmacyPageProps> = ({
               aria-label="View Pharmacy Notifications"
               title="Pharmacy Alerts & Reminders"
             >
-              <Bell className="w-4 h-4 sm:w-5 sm:h-5 text-teal-300" />
+              <Bell className="w-5 h-5 text-teal-300" />
               {unreadCount > 0 && (
                 <span className="absolute -top-1 -right-1 bg-amber-500 text-slate-900 text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center border border-[#002b49] animate-pulse">
                   {unreadCount}
@@ -695,32 +640,12 @@ export const DoorstepPharmacyPage: React.FC<DoorstepPharmacyPageProps> = ({
               )}
             </button>
 
-            {/* Partner / Staff QR Scanner Button - strictly restricted to authorized Partner / Pharmacy Staff */}
-            {isAuthorizedStaff && (
-              <button
-                onClick={() => setIsScannerModalOpen(true)}
-                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs sm:text-sm font-bold shadow-sm transition-all active:scale-95 cursor-pointer"
-                title="Authorized Pharmacy Staff QR Scanner & Invalidation Terminal"
-              >
-                <ScanLine className="w-4 h-4 text-amber-300" />
-                <span className="hidden sm:inline">Staff Scanner</span>
-              </button>
-            )}
-
-            {/* Upload Rx Button */}
-            <button
-              onClick={() => setIsUploadModalOpen(true)}
-              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#008080] hover:bg-[#006666] text-white text-xs sm:text-sm font-bold shadow-sm transition-all active:scale-95 cursor-pointer"
-            >
-              <UploadCloud className="w-4 h-4" />
-              <span>Upload Rx</span>
-            </button>
-
             {/* Shopping Cart Button */}
             <button
               onClick={() => setIsCartOpen(true)}
               className="relative p-2 rounded-lg bg-[#001d31] hover:bg-[#003e6b] text-white border border-teal-500/20 transition-all active:scale-95 cursor-pointer"
               aria-label="View Shopping Cart"
+              title="View Shopping Cart"
             >
               <ShoppingCart className="w-5 h-5 text-teal-300" />
               {totalCartItems > 0 && (
@@ -729,8 +654,136 @@ export const DoorstepPharmacyPage: React.FC<DoorstepPharmacyPageProps> = ({
                 </span>
               )}
             </button>
+
+            {/* Dedicated Hamburger Menu Toggle for Doorstep Pharmacy */}
+            <button
+              onClick={() => setIsPharmacyMenuOpen(!isPharmacyMenuOpen)}
+              className={`p-2 rounded-lg transition-all active:scale-95 cursor-pointer border ${
+                isPharmacyMenuOpen
+                  ? 'bg-teal-600 text-white border-teal-400 shadow-sm'
+                  : 'bg-[#001d31] hover:bg-[#003e6b] text-teal-300 border-teal-500/20'
+              }`}
+              aria-label="Toggle Pharmacy Navigation Menu"
+              title="Doorstep Pharmacy Menu"
+            >
+              {isPharmacyMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
           </div>
         </div>
+
+        {/* Dedicated Doorstep Pharmacy Slide-Out / Dropdown Drawer Menu */}
+        {isPharmacyMenuOpen && (
+          <div className="relative border-t border-[#003e6b] bg-[#001d31] px-4 py-4 sm:px-6 shadow-2xl transition-all">
+            <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
+                <button
+                  onClick={() => {
+                    setActiveView('catalog');
+                    setIsPharmacyMenuOpen(false);
+                  }}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer border ${
+                    activeView === 'catalog'
+                      ? 'bg-[#008080] text-white border-teal-400 shadow-xs'
+                      : 'bg-[#002b49] text-slate-200 hover:text-white border-teal-500/20 hover:bg-[#003e6b]'
+                  }`}
+                >
+                  <Pill className="w-4 h-4 text-teal-300" />
+                  <span>Medicines</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setActiveView('deals');
+                    setIsPharmacyMenuOpen(false);
+                  }}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer border ${
+                    activeView === 'deals'
+                      ? 'bg-[#008080] text-white border-teal-400 shadow-xs'
+                      : 'bg-[#002b49] text-slate-200 hover:text-white border-teal-500/20 hover:bg-[#003e6b]'
+                  }`}
+                >
+                  <Tag className="w-4 h-4 text-amber-400" />
+                  <span>Deals & Offers</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setActiveView('wallet');
+                    setIsPharmacyMenuOpen(false);
+                  }}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer border ${
+                    activeView === 'wallet'
+                      ? 'bg-[#008080] text-white border-teal-400 shadow-xs'
+                      : 'bg-[#002b49] text-slate-200 hover:text-white border-teal-500/20 hover:bg-[#003e6b]'
+                  }`}
+                >
+                  <Gift className="w-4 h-4 text-teal-300" />
+                  <span>Rewards & Wallet</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setActiveView('orders');
+                    setIsPharmacyMenuOpen(false);
+                  }}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer border ${
+                    activeView === 'orders'
+                      ? 'bg-[#008080] text-white border-teal-400 shadow-xs'
+                      : 'bg-[#002b49] text-slate-200 hover:text-white border-teal-500/20 hover:bg-[#003e6b]'
+                  }`}
+                >
+                  <Package className="w-4 h-4 text-teal-300" />
+                  <span>Orders</span>
+                  {orders.some((o) => o.deliveryStatus !== 'Delivered') && (
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                  )}
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsUploadModalOpen(true);
+                    setIsPharmacyMenuOpen(false);
+                  }}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold bg-[#008080] hover:bg-[#006666] text-white border border-teal-400 shadow-sm transition-all active:scale-95 cursor-pointer"
+                >
+                  <UploadCloud className="w-4 h-4" />
+                  <span>Upload Rx</span>
+                </button>
+
+                {isAuthorizedStaff && (
+                  <button
+                    onClick={() => {
+                      setIsScannerModalOpen(true);
+                      setIsPharmacyMenuOpen(false);
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 shadow-sm transition-all active:scale-95 cursor-pointer"
+                    title="Authorized Pharmacy Staff QR Scanner & Invalidation Terminal"
+                  >
+                    <ScanLine className="w-4 h-4 text-amber-300" />
+                    <span>Staff Scanner</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-700/60 flex items-center justify-end">
+                <button
+                  onClick={() => {
+                    setIsPharmacyMenuOpen(false);
+                    if (typeof window !== 'undefined' && window.history.length > 1) {
+                      window.history.back();
+                    } else {
+                      onBackToHome();
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-teal-300 hover:text-white text-xs sm:text-sm font-semibold transition-all border border-slate-700 cursor-pointer"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Back to Home</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* ========================================================================= */}

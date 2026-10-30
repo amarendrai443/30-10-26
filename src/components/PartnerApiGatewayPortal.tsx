@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Clock,
   ArrowRight,
+  ArrowLeft,
   ExternalLink,
   Copy,
   Check,
@@ -365,9 +366,22 @@ export const PartnerApiGatewayPortal: React.FC<PartnerApiGatewayPortalProps> = (
       <header className="sticky top-0 z-50 bg-[#001f33] border-b border-teal-500/20 shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-18 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-teal-500/10 border border-teal-400/30 flex items-center justify-center text-teal-400 shadow-sm">
-              <Server className="w-5 h-5" />
-            </div>
+            <a
+              href="https://ibb.co/SDYB7XbW"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center shrink-0 shadow-sm border border-teal-400/30 hover:opacity-90"
+              title="Official Nhealth Logo"
+            >
+              <img
+                src="https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
+                alt="Nhealth Logo"
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  e.currentTarget.src = 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
+                }}
+              />
+            </a>
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-lg font-black text-white">Nhealth™</span>
@@ -384,10 +398,18 @@ export const PartnerApiGatewayPortal: React.FC<PartnerApiGatewayPortalProps> = (
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={onNavigateHome}
-              className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all cursor-pointer border border-white/10"
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.history.length > 1) {
+                  window.history.back();
+                } else {
+                  onNavigateHome();
+                }
+              }}
+              className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all cursor-pointer border border-white/10 flex items-center gap-1.5"
+              title="Back strictly one step"
             >
-              Back to Patient App
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Back</span>
             </button>
           </div>
         </div>

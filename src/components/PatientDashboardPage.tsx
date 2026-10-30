@@ -1041,11 +1041,11 @@ export const PatientDashboardPage: React.FC<PatientDashboardPageProps> = ({
           >
             {/* Official Nhealth Logo from https://ibb.co/SDYB7XbW - Clean without separate icon next to name */}
             <img
-              src="https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
+              src="https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
               alt="Nhealth Official Logo"
               className="h-8 sm:h-9 md:h-10 w-auto object-contain rounded-lg shrink-0 group-hover:scale-105 transition-transform shadow-xs"
               onError={(e) => {
-                e.currentTarget.src = 'https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
+                e.currentTarget.src = 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
               }}
             />
             <div className="flex flex-col min-w-0">

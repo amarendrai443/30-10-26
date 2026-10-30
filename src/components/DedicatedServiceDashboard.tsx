@@ -185,50 +185,6 @@ export const DedicatedServiceDashboard: React.FC<DedicatedServiceDashboardProps>
     { sender: 'Case Manager', text: 'Hello! I have confirmed your appointment slots and coordinated with the Apollo OPD desk.', time: '09:15 AM' },
   ]);
 
-  // Fast secure pass generator
-  const handleGenerateServicePass = () => {
-    const refId = 'NH-' + Math.floor(100000 + Math.random() * 900000);
-    
-    let dept: TokenDepartment = 'general';
-    if (serviceKey === 'ambulance-24-7' || serviceKey === 'nhealth-careride') {
-      dept = 'ambulance';
-    } else if (serviceKey === 'doctor-home-visits' || serviceKey === 'prepaid-premium-opd') {
-      dept = 'doctor';
-    } else if (
-      serviceKey === 'home-diagnostics' ||
-      serviceKey === 'xray-portable-diagnostics' ||
-      serviceKey === 'diagnostics-advance-imaging' ||
-      serviceKey === 'blood-bank-support'
-    ) {
-      dept = 'diagnostics';
-    } else if (
-      serviceKey === 'specialized-nursing-care' ||
-      serviceKey === 'bedside-assistance' ||
-      serviceKey === 'eldercare-senior-assistance' ||
-      serviceKey === 'physiotherapy-at-home' ||
-      serviceKey === 'dental-care-oral-health'
-    ) {
-      dept = 'nursing';
-    }
-
-    const token = createOneTimeSecureToken(
-      refId,
-      'general_service',
-      currentService.name,
-      {
-        patientName,
-        patientPhone,
-        deliveryAddress: 'Nhealth Coordinated Clinical Services',
-        totalAmount: 499,
-        notes: `Service: ${currentService.name}. Slot: ${selectedSlot}. Department: ${dept}. Verified Partner Pass.`,
-      },
-      false,
-      undefined,
-      dept
-    );
-    setActiveToken(token);
-    setActiveTab('pass');
-  };
 
   const handleAddVitals = (e: React.FormEvent) => {
     e.preventDefault();
@@ -252,17 +208,43 @@ export const DedicatedServiceDashboard: React.FC<DedicatedServiceDashboardProps>
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col">
       {/* Top Navigation & Breadcrumb Header */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs">
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={onBackToHome}
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.history.length > 1) {
+                  window.history.back();
+                } else {
+                  onBackToHome();
+                }
+              }}
               className="p-2 rounded-xl text-slate-600 hover:text-[#008080] hover:bg-teal-50 transition-colors cursor-pointer border border-slate-200"
-              title="Back to Home / Services"
+              title="Back strictly one step"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
+            <div className="h-5 w-px bg-slate-200 hidden sm:block" />
+            <a
+              href="https://ibb.co/SDYB7XbW"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center shrink-0 hover:opacity-90 transition-opacity"
+              title="Official Nhealth Logo"
+            >
+              <img
+                src="https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
+                alt="Nhealth Logo"
+                className="h-8 w-auto object-contain shrink-0"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (target.src !== 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png') {
+                    target.src = 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
+                  }
+                }}
+              />
+            </a>
             <div>
               <div className="text-[10px] font-bold uppercase tracking-wider text-[#008080]">
                 Nhealth Specialized Services
@@ -310,20 +292,6 @@ export const DedicatedServiceDashboard: React.FC<DedicatedServiceDashboardProps>
                 <span>100% Certified Practitioners</span>
               </span>
             </div>
-          </div>
-
-          <div className="flex flex-col items-center sm:items-end gap-3 w-full md:w-auto">
-            <button
-              type="button"
-              onClick={handleGenerateServicePass}
-              className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-white hover:bg-teal-50 text-[#002b49] font-black text-sm flex items-center justify-center gap-2 shadow-lg transition-transform active:scale-95 cursor-pointer"
-            >
-              <QrCode className="w-4 h-4 text-[#008080]" />
-              <span>Generate 72h Secure Token Pass</span>
-            </button>
-            <p className="text-[11px] text-teal-100/80 text-center sm:text-right">
-              Encrypted QR Token with one-time redemption for partner staff
-            </p>
           </div>
         </div>
       </section>
@@ -662,22 +630,14 @@ export const DedicatedServiceDashboard: React.FC<DedicatedServiceDashboardProps>
                 </div>
               )}
 
-              <div className="pt-2 flex flex-col sm:flex-row gap-3">
+              <div className="pt-2">
                 <button
                   type="button"
                   onClick={() => onOpenBookingModal(currentService, `Slot: ${selectedSlot}`)}
-                  className="flex-1 py-3.5 px-6 rounded-2xl bg-[#008080] hover:bg-[#006666] text-white text-sm font-black shadow-md transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full py-3.5 px-6 rounded-2xl bg-[#008080] hover:bg-[#006666] text-white text-sm font-black shadow-md transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
                 >
                   <span>Confirm Slot &amp; Book Doorstep Care</span>
                   <ArrowRight className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleGenerateServicePass}
-                  className="py-3.5 px-5 rounded-2xl border border-slate-300 hover:border-[#008080] text-slate-700 hover:text-[#008080] text-sm font-bold transition-all cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <QrCode className="w-4 h-4" />
-                  <span>Generate QR Pass</span>
                 </button>
               </div>
             </div>
@@ -1703,19 +1663,12 @@ export const DedicatedServiceDashboard: React.FC<DedicatedServiceDashboardProps>
                 <SecureQrTokenCard token={activeToken} />
               </div>
             ) : (
-              <div className="text-center max-w-sm space-y-4 p-8 bg-white rounded-3xl border border-slate-200 shadow-2xs">
-                <QrCode className="w-12 h-12 text-[#008080] mx-auto animate-pulse" />
-                <h4 className="text-base font-black text-[#002b49]">Generate 72-Hour Secure QR Pass</h4>
+              <div className="text-center max-w-sm space-y-3 p-8 bg-white rounded-3xl border border-slate-200 shadow-2xs">
+                <QrCode className="w-12 h-12 text-[#008080] mx-auto opacity-70" />
+                <h4 className="text-base font-black text-[#002b49]">No Active Booking Pass</h4>
                 <p className="text-xs text-slate-500">
-                  Create a unique, encrypted one-time token for visiting clinicians or partner staff.
+                  Book a doorstep healthcare appointment to view and share your encrypted QR verification pass here.
                 </p>
-                <button
-                  type="button"
-                  onClick={handleGenerateServicePass}
-                  className="w-full py-3 rounded-2xl bg-[#008080] text-white text-xs font-black shadow-sm cursor-pointer"
-                >
-                  Generate Pass Now
-                </button>
               </div>
             )}
           </div>

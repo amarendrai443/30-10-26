@@ -495,16 +495,38 @@ export const HrPortalPage: React.FC<HrPortalPageProps> = ({ onNavigateHome, onNa
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100">
       {/* Top HR Header Bar */}
-      <header className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800 px-4 sm:px-6 lg:px-8 py-3.5">
+      <header className="sticky top-0 z-50 bg-slate-950/90 backdrop-blur-md border-b border-slate-800 px-4 sm:px-6 lg:px-8 py-3.5 shadow-md">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
-              onClick={onNavigateHome}
-              className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
-              title="Return to Home"
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.history.length > 1) {
+                  window.history.back();
+                } else {
+                  onNavigateHome();
+                }
+              }}
+              className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+              title="Back strictly one step"
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
+            <a
+              href="https://ibb.co/SDYB7XbW"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-9 h-9 rounded-xl bg-white p-1 flex items-center justify-center shrink-0 shadow-sm border border-slate-700 hover:opacity-90"
+              title="Official Nhealth Logo"
+            >
+              <img
+                src="https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
+                alt="Nhealth Logo"
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  e.currentTarget.src = 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
+                }}
+              />
+            </a>
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-bold text-white text-base sm:text-lg tracking-tight">Nhealth HR Portal</span>

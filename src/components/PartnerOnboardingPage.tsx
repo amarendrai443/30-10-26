@@ -319,26 +319,34 @@ export const PartnerOnboardingPage: React.FC<PartnerOnboardingPageProps> = ({
           <div className="flex items-center shrink-0">
             <button
               type="button"
-              onClick={onNavigateHome}
-              aria-label="Back to home"
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.history.length > 1) {
+                  window.history.back();
+                } else {
+                  onNavigateHome();
+                }
+              }}
+              aria-label="Back strictly one step"
+              title="Back"
               className="inline-flex items-center justify-center w-10 h-10 rounded-xl text-slate-700 hover:text-[#008080] hover:bg-slate-100 active:bg-slate-200 transition-colors cursor-pointer shrink-0 border border-slate-200/60 sm:border-transparent"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
           </div>
 
-          <div
-            onClick={onNavigateHome}
-            role="button"
-            tabIndex={0}
-            className="flex items-center gap-2 cursor-pointer group min-w-0"
+          <a
+            href="https://ibb.co/SDYB7XbW"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 cursor-pointer group min-w-0 hover:opacity-95"
+            title="Official Nhealth Logo"
           >
             <img
-              src="https://i.ibb.co/6JR2bwmJ/whatsapp-profile-pic.jpg"
+              src="https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
               alt="Nhealth Logo"
               className="h-8 sm:h-10 w-auto object-contain rounded-lg border border-teal-500/30 shrink-0"
               onError={(e) => {
-                e.currentTarget.src = '/splash-logo.png';
+                e.currentTarget.src = 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
               }}
             />
             <span
@@ -350,7 +358,7 @@ export const PartnerOnboardingPage: React.FC<PartnerOnboardingPageProps> = ({
             <span className="hidden sm:inline-block ml-1 text-xs font-bold px-2 py-0.5 rounded-md bg-teal-50 text-[#008080] border border-teal-200 shrink-0">
               Partner Portal
             </span>
-          </div>
+          </a>
 
           <div className="flex items-center gap-1.5 sm:gap-3 text-xs text-slate-500 shrink-0">
             <span className="hidden md:inline text-slate-400">Need assistance?</span>

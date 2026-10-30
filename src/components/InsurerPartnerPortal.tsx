@@ -5,6 +5,7 @@ import {
   Lock,
   Mail,
   ArrowRight,
+  ArrowLeft,
   LogOut,
   CheckCircle2,
   Clock,
@@ -536,9 +537,15 @@ export const InsurerPartnerPortal: React.FC<InsurerPartnerPortalProps> = ({ onNa
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
             {/* Exact Nhealth Logo from link: https://ibb.co/SDYB7XbW with reliable direct asset fallback */}
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white p-1 flex items-center justify-center shrink-0 shadow-sm border border-white/20">
+            <a
+              href="https://ibb.co/SDYB7XbW"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white p-1 flex items-center justify-center shrink-0 shadow-sm border border-white/20 hover:opacity-90"
+              title="Official Nhealth Logo"
+            >
               <img
-                src="https://i.ibb.co/SDYB7XbW/Nhealth-logo.png"
+                src="https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
                 alt="Nhealth Logo"
                 className="w-full h-full object-contain"
                 onError={(e) => {
@@ -548,7 +555,7 @@ export const InsurerPartnerPortal: React.FC<InsurerPartnerPortalProps> = ({ onNa
                   }
                 }}
               />
-            </div>
+            </a>
 
             <div>
               <div className="flex items-center gap-2">
@@ -584,10 +591,18 @@ export const InsurerPartnerPortal: React.FC<InsurerPartnerPortalProps> = ({ onNa
             ) : (
               <button
                 type="button"
-                onClick={onNavigateHome}
-                className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all cursor-pointer border border-white/10"
+                onClick={() => {
+                  if (typeof window !== 'undefined' && window.history.length > 1) {
+                    window.history.back();
+                  } else {
+                    onNavigateHome();
+                  }
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all cursor-pointer border border-white/10 flex items-center gap-1.5"
+                title="Back strictly one step"
               >
-                Back to Patient Portal
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Back</span>
               </button>
             )}
           </div>

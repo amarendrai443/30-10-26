@@ -62,9 +62,7 @@ import { UniversalSearchFilter } from './components/UniversalSearchFilter';
 import { AuthPage } from './components/AuthPage';
 import { AccountRecoveryModal } from './components/AccountRecoveryModal';
 import { verifyUserPasskey } from './utils/passkeyAuthStorage';
-import { BiometricSetupPromptModal } from './components/BiometricSetupPromptModal';
 import { EmailOtpVerificationModal } from './components/EmailOtpVerificationModal';
-import { hasBiometricForUser, authenticateNativeBiometric } from './utils/biometricAuthStorage';
 import { PartnerOnboardingPage } from './components/PartnerOnboardingPage';
 import { AdminDashboardPage } from './components/AdminDashboardPage';
 import { CorporateEnquiriesPage } from './components/CorporateEnquiriesPage';
@@ -127,8 +125,8 @@ import { generateMultiDayTokens } from './utils/multiDayTokenEngine';
 import { MobileHeroSplitCarousel } from './components/MobileHeroSplitCarousel';
 
 
-const NHEALTH_LOGO_URL = 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
-const NHEALTH_LOGO_FALLBACK = '/nhealth_logo.png';
+const NHEALTH_LOGO_URL = 'https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
+const NHEALTH_LOGO_FALLBACK = 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
 
 const HERO_BANNER_WIDE_URL = 'https://i.ibb.co/2ryZtnM/Healthcare-at-Home-Network-Hub-2.png';
 const HERO_BANNER_WIDE_FALLBACK = '/hero_banner_wide.png';
@@ -499,7 +497,19 @@ export default function App() {
   const [showExitPrompt, setShowExitPrompt] = useState(false);
   useEffect(() => navHistory.onExitPrompt(setShowExitPrompt), []);
 
-  const navigateTo = (route: RoutePath, urlPath?: string) => {
+  // Centralized Route History Stack for Strict 1-Step Back Navigation
+  const [routeHistory, setRouteHistory] = useState<RoutePath[]>(() => {
+    try {
+      const stored = sessionStorage.getItem('nhealth_route_history');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return [currentRoute];
+  });
+
+  const navigateTo = (route: RoutePath, urlPath?: string, isBackAction = false) => {
     let path = urlPath;
     if (!path) {
       if (route === 'home') path = '/';
@@ -511,10 +521,59 @@ export default function App() {
         localStorage.setItem('nhealth_active_route', route);
         sessionStorage.setItem('nhealth_active_route', route);
       } catch {}
-      window.history.pushState({ route }, '', path);
+      if (!isBackAction) {
+        window.history.pushState({ route }, '', path);
+      }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+
+    if (!isBackAction && route !== currentRoute) {
+      setRouteHistory((prev) => {
+        const updated = [...prev, route];
+        try {
+          sessionStorage.setItem('nhealth_route_history', JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+    }
+
     setCurrentRoute(route);
+  };
+
+  // Strict 1-step back navigation function across all modules
+  const navigateBack = () => {
+    // 1. If any modal/overlay is open, close top modal first without changing underlying page
+    if (navHistory.hasOpenModals()) {
+      navHistory.closeTopModal();
+      return;
+    }
+
+    // 2. If browser history exists, use native back
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+
+    // 3. Fallback: pop strictly 1 route from application routeHistory stack
+    if (routeHistory.length > 1) {
+      const updated = [...routeHistory];
+      updated.pop(); // remove current route
+      const prevRoute = updated[updated.length - 1];
+      setRouteHistory(updated);
+      try {
+        sessionStorage.setItem('nhealth_route_history', JSON.stringify(updated));
+      } catch {}
+      if (prevRoute && prevRoute !== currentRoute) {
+        navigateTo(prevRoute, undefined, true);
+        return;
+      }
+    }
+
+    // 4. Default 1-step back destination: user dashboard if logged in, else home
+    const fallbackRoute: RoutePath = isLoggedIn && (currentUser?.role === 'Patient' || currentUser?.accountType === 'Patient')
+      ? 'patient-dashboard'
+      : 'home';
+    navigateTo(fallbackRoute, fallbackRoute === 'home' ? '/' : `/${fallbackRoute}`, true);
   };
 
   // Browser History & Popstate Navigation Handler (Step-by-step back and gradual exit flow)
@@ -537,6 +596,21 @@ export default function App() {
       } else {
         destRoute = getRouteFromLocation();
       }
+
+      // Sync routeHistory stack on popstate so it stays aligned with browser history
+      setRouteHistory((prev) => {
+        if (destRoute && prev.length > 1) {
+          const idx = prev.lastIndexOf(destRoute);
+          if (idx !== -1) {
+            const trimmed = prev.slice(0, idx + 1);
+            try {
+              sessionStorage.setItem('nhealth_route_history', JSON.stringify(trimmed));
+            } catch {}
+            return trimmed;
+          }
+        }
+        return prev;
+      });
 
       // If destRoute is known and differs from current view, take strictly 1 step back to that view
       if (destRoute && destRoute !== currentRoute) {
@@ -805,9 +879,6 @@ export default function App() {
     });
   };
 
-  const [showBiometricSetupPrompt, setShowBiometricSetupPrompt] = useState(false);
-  const [pendingBiometricUser, setPendingBiometricUser] = useState<UserAccount | null>(null);
-
   const proceedToDashboard = (user: UserAccount) => {
     setIsLoggedIn(true);
     setCurrentUser(user);
@@ -826,32 +897,7 @@ export default function App() {
   };
 
   const handleAuthSuccess = (user: UserAccount) => {
-    // Immediately following a successful login (for both Patients and Partners),
-    // display clean modal: "Setup Login with Biometric?"
-    const identifier = user.phone || user.email || user.id;
-    const hasBio = hasBiometricForUser(identifier);
-    if (!hasBio) {
-      setPendingBiometricUser(user);
-      setShowBiometricSetupPrompt(true);
-    } else {
-      proceedToDashboard(user);
-    }
-  };
-
-  const handleBiometricSetupDismiss = () => {
-    setShowBiometricSetupPrompt(false);
-    if (pendingBiometricUser) {
-      proceedToDashboard(pendingBiometricUser);
-      setPendingBiometricUser(null);
-    }
-  };
-
-  const handleBiometricSetupProceed = () => {
-    setShowBiometricSetupPrompt(false);
-    if (pendingBiometricUser) {
-      proceedToDashboard(pendingBiometricUser);
-      setPendingBiometricUser(null);
-    }
+    proceedToDashboard(user);
   };
 
   const handleAppEmailOtpSuccess = () => {
@@ -1606,17 +1652,11 @@ export default function App() {
       <>
         <AuthPage
           onSuccess={handleAuthSuccess}
-          onNavigateHome={() => navigateTo('home', '/')}
+          onNavigateHome={navigateBack}
           onNavigatePartnerOnboarding={() => navigateTo('partner-with-us', '/partner-with-us')}
           onNavigateAdmin={() => navigateTo('command-center', '/command-center')}
           partners={partners}
           onUpdatePartner={handleUpdatePartner}
-        />
-        <BiometricSetupPromptModal
-          isOpen={showBiometricSetupPrompt}
-          user={pendingBiometricUser}
-          onProceed={handleBiometricSetupProceed}
-          onDismiss={handleBiometricSetupDismiss}
         />
       </>
     );
@@ -1626,7 +1666,7 @@ export default function App() {
     return (
       <PartnerOnboardingPage
         onAddPartner={handleAddPartner}
-        onNavigateHome={() => navigateTo('home', '/')}
+        onNavigateHome={navigateBack}
       />
     );
   }
@@ -1642,7 +1682,7 @@ export default function App() {
           const updated = updateEnquiryStatus(id, status, notes);
           setEnquiries(updated);
         }}
-        onNavigateHome={() => navigateTo('home', '/')}
+        onNavigateHome={navigateBack}
         onNavigateOnboarding={() => navigateTo('partner-with-us', '/partner-with-us')}
       />
     );
@@ -1651,7 +1691,7 @@ export default function App() {
   if (currentRoute === 'corporate-enquiries') {
     return (
       <CorporateEnquiriesPage
-        onNavigateHome={() => navigateTo('home', '/')}
+        onNavigateHome={navigateBack}
         onNavigatePartner={() => navigateTo('partner-with-us', '/partner-with-us')}
         onEnquirySubmitted={(newEnq) => setEnquiries((prev) => [newEnq, ...prev])}
       />
@@ -1667,13 +1707,7 @@ export default function App() {
           accMarqueeItems={accMarqueeItems}
           partnerScrollDuration={partnerScrollDuration}
           accreditationsScrollDuration={accreditationsScrollDuration}
-          onBackToHome={() => {
-            if (isLoggedIn && (currentUser?.role === 'Patient' || currentUser?.accountType === 'Patient')) {
-              navigateTo('patient-dashboard', '/patient-dashboard#overview');
-            } else {
-              navigateTo('home', '/');
-            }
-          }}
+          onBackToHome={navigateBack}
           onNavigatePartnerWithUs={() => navigateTo('partner-with-us', '/partner-with-us')}
           onOpenBookingFor={(serviceName) => openBookingFor(serviceName)}
         />
@@ -1730,7 +1764,7 @@ export default function App() {
   if (currentRoute === 'teams') {
     return (
       <TeamsPage
-        onNavigateHome={() => navigateTo('home', '/')}
+        onNavigateHome={navigateBack}
         onNavigatePartner={() => navigateTo('partner-with-us', '/partner-with-us')}
         onNavigateCorporate={() => navigateTo('corporate-enquiries', '/corporate-enquiries')}
       />
@@ -1740,7 +1774,7 @@ export default function App() {
   if (currentRoute === 'hrthings') {
     return (
       <HrPortalPage
-        onNavigateHome={() => navigateTo('home', '/')}
+        onNavigateHome={navigateBack}
         onNavigateAdmin={() => navigateTo('command-center', '/command-center')}
       />
     );
@@ -1750,13 +1784,7 @@ export default function App() {
     return (
       <>
         <OnlineConsultationPage
-          onBackToHome={() => {
-            if (isLoggedIn && (currentUser?.role === 'Patient' || currentUser?.accountType === 'Patient')) {
-              navigateTo('patient-dashboard', '/patient-dashboard#overview');
-            } else {
-              navigateTo('home', '/');
-            }
-          }}
+          onBackToHome={navigateBack}
           onBookDoctor={(doctor, mode) => {
             const matchedService = EXTRACTED_SERVICES.find((s) => s.id === 'online-doctor') || EXTRACTED_SERVICES[0];
             setSelectedServiceForBooking(matchedService);
@@ -1831,13 +1859,7 @@ export default function App() {
       <DoorstepPharmacyPage
         isLoggedIn={isLoggedIn}
         onPromptLogin={() => navigateTo('auth', '/auth')}
-        onBackToHome={() => {
-          if (isLoggedIn && (currentUser?.role === 'Patient' || currentUser?.accountType === 'Patient')) {
-            navigateTo('patient-dashboard', '/patient-dashboard#overview');
-          } else {
-            navigateTo('home', '/');
-          }
-        }}
+        onBackToHome={navigateBack}
         onOpenBookingModal={(serviceName) => openBookingFor(serviceName)}
       />
     );
@@ -1867,13 +1889,7 @@ export default function App() {
       <>
         <DedicatedServiceDashboard
           serviceKey={currentRoute}
-          onBackToHome={() => {
-            if (isLoggedIn && (currentUser?.role === 'Patient' || currentUser?.accountType === 'Patient')) {
-              navigateTo('patient-dashboard', '/patient-dashboard#overview');
-            } else {
-              navigateTo('home', '/');
-            }
-          }}
+          onBackToHome={navigateBack}
           onOpenBookingModal={(service, prefill) => {
             setSelectedServiceForBooking(service);
             if (prefill) {
@@ -1991,12 +2007,6 @@ export default function App() {
             }
           }}
         />
-        <BiometricSetupPromptModal
-          isOpen={showBiometricSetupPrompt}
-          user={pendingBiometricUser}
-          onProceed={handleBiometricSetupProceed}
-          onDismiss={handleBiometricSetupDismiss}
-        />
       </>
     );
   }
@@ -2055,14 +2065,6 @@ export default function App() {
 
         {/* Browser Web Push Permission Prompt */}
         <NotificationPermissionPrompt />
-
-        {/* Post-Login Biometric Setup Prompt */}
-        <BiometricSetupPromptModal
-          isOpen={showBiometricSetupPrompt}
-          user={pendingBiometricUser}
-          onProceed={handleBiometricSetupProceed}
-          onDismiss={handleBiometricSetupDismiss}
-        />
       </>
     );
   }
@@ -2079,7 +2081,9 @@ export default function App() {
         <div className="w-full lg:max-w-none px-2.5 sm:px-5 lg:px-6 xl:px-8 2xl:px-12 h-20 flex items-center justify-between min-w-0">
           {/* Zone 1: Brand Wordmark & Official Logo */}
           <a
-            href="#home"
+            href="https://ibb.co/SDYB7XbW"
+            target="_blank"
+            rel="noopener noreferrer"
             onClick={(e) => {
               if (currentRoute !== 'home') {
                 e.preventDefault();
@@ -2087,6 +2091,7 @@ export default function App() {
               }
             }}
             className="flex items-center gap-1.5 sm:gap-2 group transition-opacity hover:opacity-90 whitespace-nowrap shrink-0 pr-1 sm:pr-2 xl:pr-4"
+            title="Official Nhealth Logo"
           >
             <img
               src={NHEALTH_LOGO_URL}
@@ -2094,7 +2099,7 @@ export default function App() {
               className="h-7 sm:h-9 lg:h-11 w-auto object-contain shrink-0"
               onError={(e) => {
                 const target = e.currentTarget;
-                if (target.src !== window.location.origin + NHEALTH_LOGO_FALLBACK) {
+                if (target.src !== NHEALTH_LOGO_FALLBACK) {
                   target.src = NHEALTH_LOGO_FALLBACK;
                 }
               }}
@@ -4175,31 +4180,6 @@ export default function App() {
               </button>
               <button
                 type="button"
-                onClick={async () => {
-                  const res = await authenticateNativeBiometric(loginPhone || undefined);
-                  if (res.success && res.record) {
-                    const bioUser: UserAccount = {
-                      id: res.record.userId,
-                      name: res.record.userName,
-                      phone: res.record.userIdentifier,
-                      accountType: res.record.role || 'Patient & Family Caretaker',
-                    };
-                    setIsLoggedIn(true);
-                    setCurrentUser(bioUser);
-                    setLoginModalOpen(false);
-                    proceedToDashboard(bioUser);
-                  } else {
-                    setLoginPasskeyError(res.error || 'Biometric authentication canceled.');
-                  }
-                }}
-                className="flex-1 py-2 text-[11px] sm:text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1 text-teal-800 hover:text-teal-950 bg-teal-100/60 hover:bg-teal-100"
-                title="Instant Login with Fingerprint or Face ID"
-              >
-                <Fingerprint className="w-3.5 h-3.5 text-[#008080]" />
-                <span>Biometric</span>
-              </button>
-              <button
-                type="button"
                 onClick={() => {
                   setLoginMode('signup');
                   setLoginPasskeyMode(false);
@@ -4236,10 +4216,7 @@ export default function App() {
                   onClick={() => {
                     setLoginModalOpen(false);
                     setLoginSubmitted(false);
-                    if (currentUser && !hasBiometricForUser(currentUser.phone || currentUser.email || currentUser.id)) {
-                      setPendingBiometricUser(currentUser);
-                      setShowBiometricSetupPrompt(true);
-                    } else if (currentUser) {
+                    if (currentUser) {
                       proceedToDashboard(currentUser);
                     }
                   }}
@@ -5369,14 +5346,6 @@ export default function App() {
         onVerifySuccess={handleAppEmailOtpSuccess}
         onResendOtp={handleResendAppEmailOtp}
         onClose={() => setAppEmailOtpModalOpen(false)}
-      />
-
-      {/* Post-Login Biometric Setup Prompt Modal */}
-      <BiometricSetupPromptModal
-        isOpen={showBiometricSetupPrompt}
-        user={pendingBiometricUser}
-        onProceed={handleBiometricSetupProceed}
-        onDismiss={handleBiometricSetupDismiss}
       />
     </div>
   );

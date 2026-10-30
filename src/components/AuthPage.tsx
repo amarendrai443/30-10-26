@@ -47,7 +47,6 @@ import {
 import { UserAccount } from '../types/serviceBooking';
 import { AccountRecoveryModal } from './AccountRecoveryModal';
 import { verifyUserPasskey, getStoredPasskeys } from '../utils/passkeyAuthStorage';
-import { authenticateNativeBiometric } from '../utils/biometricAuthStorage';
 import { EmailOtpVerificationModal } from './EmailOtpVerificationModal';
 
 interface AuthPageProps {
@@ -168,7 +167,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
   const [isLoading, setIsLoading] = useState(false);
   const [googleAuthLoading, setGoogleAuthLoading] = useState(false);
-  const [biometricLoading, setBiometricLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [singleIdentityNotice, setSingleIdentityNotice] = useState('');
@@ -1042,86 +1040,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     }, 400);
   };
 
-  // Fast Biometric Authentication Handler (Touch ID / Face ID)
-  const handleBiometricLogin = async (context: 'patient' | 'partner') => {
-    setErrorMsg('');
-    setSuccessMsg('');
-    setBiometricLoading(true);
-
-    try {
-      const targetId =
-        context === 'patient'
-          ? (loginMethod === 'phone' ? loginPhone.trim() : loginEmail.trim())
-          : partnerLoginId.trim();
-
-      const res = await authenticateNativeBiometric(targetId || undefined);
-
-      if (!res.success || !res.record) {
-        setErrorMsg(res.error || 'Biometric authentication was not completed.');
-        setBiometricLoading(false);
-        return;
-      }
-
-      const record = res.record;
-      if (context === 'partner' || record.role !== 'Patient') {
-        const allPartners = [...partners, ...INITIAL_PARTNERS];
-        const matched = allPartners.find(
-          (p) =>
-            p.id.toLowerCase() === record.userId.toLowerCase() ||
-            p.email.toLowerCase() === record.userIdentifier.toLowerCase() ||
-            p.phone.replace(/\D/g, '') === record.userIdentifier.replace(/\D/g, '')
-        );
-
-        if (matched) {
-          const partnerAccount: UserAccount = {
-            id: matched.id,
-            name: matched.contactPerson || matched.entityName,
-            phone: matched.phone,
-            email: matched.email,
-            accountType: 'Partner',
-            role: matched.category,
-            entityName: matched.entityName,
-            roles: ['Partner', matched.category],
-            provider: 'email',
-          };
-          setSuccessMsg(`✓ Biometric Verified! Welcome ${matched.entityName}.`);
-          setTimeout(() => {
-            setBiometricLoading(false);
-            onSuccess(partnerAccount);
-          }, 400);
-          return;
-        }
-      }
-
-      const identities = getStoredIdentities();
-      const existing = identities.find(
-        (i) =>
-          i.id === record.userId ||
-          i.phone === record.userIdentifier ||
-          i.email.toLowerCase() === record.userIdentifier.toLowerCase()
-      );
-
-      const user: UserAccount = {
-        id: existing ? existing.id : record.userId,
-        name: existing ? existing.name : record.userName,
-        phone: existing ? existing.phone : record.userIdentifier,
-        email: existing?.email || (record.userIdentifier.includes('@') ? record.userIdentifier : `${record.userIdentifier}@nhealth.in`),
-        accountType: 'Patient',
-        roles: existing ? existing.roles : ['Patient'],
-        provider: 'phone',
-      };
-
-      setSuccessMsg(`✓ Biometric Verified! Welcome back, ${user.name}.`);
-      setTimeout(() => {
-        setBiometricLoading(false);
-        onSuccess(user);
-      }, 400);
-    } catch {
-      setErrorMsg('Device biometric authentication could not be processed.');
-      setBiometricLoading(false);
-    }
-  };
-
   // Handle Single Identity Patient Registration with Mandatory Email OTP Verification
   const handleSignupSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1403,26 +1321,34 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           <div className="flex items-center shrink-0">
             <button
               type="button"
-              onClick={onNavigateHome}
-              aria-label="Back to home"
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.history.length > 1) {
+                  window.history.back();
+                } else {
+                  onNavigateHome();
+                }
+              }}
+              aria-label="Back strictly one step"
+              title="Back"
               className="inline-flex items-center justify-center w-10 h-10 rounded-xl text-slate-700 hover:text-[#008080] hover:bg-slate-100 active:bg-slate-200 transition-colors cursor-pointer shrink-0 border border-slate-200/60 sm:border-transparent"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
           </div>
 
-          <div
-            onClick={onNavigateHome}
-            role="button"
-            tabIndex={0}
-            className="flex items-center gap-2 cursor-pointer group min-w-0"
+          <a
+            href="https://ibb.co/SDYB7XbW"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 cursor-pointer group min-w-0 hover:opacity-95"
+            title="Official Nhealth Logo"
           >
             <img
-              src="https://i.ibb.co/6JR2bwmJ/whatsapp-profile-pic.jpg"
+              src="https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
               alt="Nhealth Logo"
               className="h-8 sm:h-10 w-auto object-contain rounded-lg border border-teal-500/30 shrink-0"
               onError={(e) => {
-                e.currentTarget.src = '/splash-logo.png';
+                e.currentTarget.src = 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
               }}
             />
             <span
@@ -1431,7 +1357,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             >
               Nhealth™
             </span>
-          </div>
+          </a>
 
           <div className="flex items-center gap-1.5 sm:gap-3 text-xs text-slate-500 shrink-0">
             <span className="hidden md:inline text-slate-400">Need assistance?</span>
@@ -1794,17 +1720,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 <div className="space-y-5">
                   {/* Google OAuth Button (Requirement 3) */}
                   {renderGoogleButton('login')}
-
-                  {/* Biometric Instant Login */}
-                  <button
-                    type="button"
-                    onClick={() => handleBiometricLogin('patient')}
-                    disabled={biometricLoading || isLoading}
-                    className="w-full py-2.5 px-4 rounded-xl border border-teal-300 hover:border-teal-400 bg-teal-50/70 hover:bg-teal-50 text-teal-900 text-xs sm:text-sm font-bold flex items-center justify-center gap-2.5 transition-all shadow-2xs hover:shadow-xs active:scale-[0.99] cursor-pointer"
-                  >
-                    <Fingerprint className="w-4 h-4 text-[#008080]" />
-                    <span>{biometricLoading ? 'Verifying Biometrics...' : 'Sign In with Biometric (Touch ID / Face ID)'}</span>
-                  </button>
 
                   {/* Login Mode Toggle: Standard vs Passkey (Authentication Security Upgrade) */}
                   <div className="flex items-center justify-between p-1.5 bg-slate-100 rounded-xl">
@@ -2311,17 +2226,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 <div className="space-y-5 animate-in fade-in duration-200">
                   {/* Google OAuth Button for Partners */}
                   {renderGoogleButton('partner')}
-
-                  {/* Biometric Instant Login for Partners */}
-                  <button
-                    type="button"
-                    onClick={() => handleBiometricLogin('partner')}
-                    disabled={biometricLoading || isLoading}
-                    className="w-full py-2.5 px-4 rounded-xl border border-teal-300 hover:border-teal-400 bg-teal-50/70 hover:bg-teal-50 text-teal-900 text-xs sm:text-sm font-bold flex items-center justify-center gap-2.5 transition-all shadow-2xs hover:shadow-xs active:scale-[0.99] cursor-pointer"
-                  >
-                    <Fingerprint className="w-4 h-4 text-[#008080]" />
-                    <span>{biometricLoading ? 'Verifying Partner Biometrics...' : 'Partner Sign In with Biometric (Touch ID / Face ID)'}</span>
-                  </button>
 
                   {/* Partner Login Mode Toggle: Standard vs Passkey */}
                   <div className="flex items-center justify-between p-1.5 bg-slate-100 rounded-xl">

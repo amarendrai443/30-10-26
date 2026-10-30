@@ -37,8 +37,8 @@ export const TeamsPage: React.FC<TeamsPageProps> = ({
   onNavigateCorporate,
 }) => {
   // Official Nhealth Logo from https://ibb.co/SDYB7XbW
-  const officialLogoUrl = 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
-  const fallbackLogoUrl = 'https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
+  const officialLogoUrl = 'https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
+  const fallbackLogoUrl = 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
 
   const [activePillar, setActivePillar] = useState<'clinical' | 'tech' | 'network'>('clinical');
   const [showRoleModal, setShowRoleModal] = useState(false);
@@ -182,7 +182,7 @@ export const TeamsPage: React.FC<TeamsPageProps> = ({
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans selection:bg-teal-500 selection:text-white">
       {/* Top Corporate Navigation Bar */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between">
           {/* Mobile & Tablet Header (ONLY Nhealth Logo & Name left-aligned, Hamburger Icon right-aligned) */}
           <div className="flex lg:hidden items-center justify-between w-full">
@@ -257,11 +257,18 @@ export const TeamsPage: React.FC<TeamsPageProps> = ({
             <div className="flex items-center gap-4">
               <button
                 type="button"
-                onClick={onNavigateHome}
+                onClick={() => {
+                  if (typeof window !== 'undefined' && window.history.length > 1) {
+                    window.history.back();
+                  } else {
+                    onNavigateHome();
+                  }
+                }}
                 className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-slate-700 hover:text-[#008080] bg-slate-100 hover:bg-slate-200/80 rounded-xl transition-all cursor-pointer"
+                title="Back strictly one step"
               >
                 <ArrowLeft className="w-4 h-4" />
-                <span>Back to Home</span>
+                <span>Back</span>
               </button>
 
               {onNavigateCorporate && (
