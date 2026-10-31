@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   ArrowLeft,
   Calendar,
@@ -205,68 +205,66 @@ export const DedicatedServiceDashboard: React.FC<DedicatedServiceDashboardProps>
     }
   };
 
-  return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col">
-      {/* Top Navigation & Breadcrumb Header */}
-      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                if (typeof window !== 'undefined' && window.history.length > 1) {
-                  window.history.back();
-                } else {
-                  onBackToHome();
+  // Memoized sticky header to isolate state and prevent UI lags during intra-dashboard updates
+  const stickyHeader = useMemo(() => (
+    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onBackToHome}
+            className="p-2 rounded-xl text-slate-600 hover:text-[#008080] hover:bg-teal-50 transition-colors cursor-pointer border border-slate-200"
+            title="Back strictly one step"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div className="h-5 w-px bg-slate-200 hidden sm:block" />
+          <a
+            href="https://ibb.co/SDYB7XbW"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center shrink-0 hover:opacity-90 transition-opacity"
+            title="Official Nhealth Logo"
+          >
+            <img
+              src="https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
+              alt="Nhealth Logo"
+              className="h-8 w-auto object-contain shrink-0"
+              onError={(e) => {
+                const target = e.currentTarget;
+                if (target.src !== 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png') {
+                  target.src = 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
                 }
               }}
-              className="p-2 rounded-xl text-slate-600 hover:text-[#008080] hover:bg-teal-50 transition-colors cursor-pointer border border-slate-200"
-              title="Back strictly one step"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <div className="h-5 w-px bg-slate-200 hidden sm:block" />
-            <a
-              href="https://ibb.co/SDYB7XbW"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center shrink-0 hover:opacity-90 transition-opacity"
-              title="Official Nhealth Logo"
-            >
-              <img
-                src="https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
-                alt="Nhealth Logo"
-                className="h-8 w-auto object-contain shrink-0"
-                onError={(e) => {
-                  const target = e.currentTarget;
-                  if (target.src !== 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png') {
-                    target.src = 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
-                  }
-                }}
-              />
-            </a>
-            <div>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-[#008080]">
-                Nhealth Specialized Services
-              </div>
-              <h1 className="text-base sm:text-lg font-black text-[#002b49] leading-tight truncate max-w-[220px] sm:max-w-md">
-                {currentService.name}
-              </h1>
+            />
+          </a>
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-[#008080]">
+              Nhealth Specialized Services
             </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => onOpenBookingModal(currentService, `Slot: ${selectedSlot}`)}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#008080] to-[#006666] hover:from-[#006666] hover:to-[#004d4d] text-white text-xs sm:text-sm font-bold shadow-sm transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
-            >
-              <Calendar className="w-4 h-4" />
-              <span>Book Appointment</span>
-            </button>
+            <h1 className="text-base sm:text-lg font-black text-[#002b49] leading-tight truncate max-w-[220px] sm:max-w-md">
+              {currentService.name}
+            </h1>
           </div>
         </div>
-      </header>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onOpenBookingModal(currentService, `Slot: ${selectedSlot}`)}
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#008080] to-[#006666] hover:from-[#006666] hover:to-[#004d4d] text-white text-xs sm:text-sm font-bold shadow-sm transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+          >
+            <Calendar className="w-4 h-4" />
+            <span>Book Appointment</span>
+          </button>
+        </div>
+      </div>
+    </header>
+  ), [currentService.name, selectedSlot, onBackToHome]);
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col">
+      {stickyHeader}
 
       {/* Hero Banner Section */}
       <section className="bg-gradient-to-r from-[#002b49] via-[#003d66] to-[#008080] text-white py-8 sm:py-10 px-4 sm:px-6 lg:px-8 relative overflow-hidden">

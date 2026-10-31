@@ -1,5 +1,5 @@
 /**
- * Centralized SPA Routing, State Persistence, Modal Stack & Gradual Exit Navigation
+ * Centralized SPA Routing, Router State Tracker, Strict History Stack & Modal Navigation
  */
 
 export interface ModalEntry {
@@ -13,11 +13,109 @@ class NavigationHistoryManager {
   private isProgrammaticBack = false;
   private lastBackPressTime = 0;
   private exitPromptListeners: Array<(show: boolean) => void> = [];
+  private historyStack: string[] = [];
+  private routeChangeListeners: Array<(route: string) => void> = [];
 
   constructor() {
     if (typeof window !== 'undefined') {
       window.addEventListener('popstate', this.handlePopState);
+      try {
+        const stored = sessionStorage.getItem('nhealth_router_history_stack');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            this.historyStack = parsed;
+          }
+        }
+      } catch {}
     }
+  }
+
+  // Synchronize initial stack if empty
+  public initStack(initialRoute: string): void {
+    if (this.historyStack.length === 0) {
+      this.historyStack = [initialRoute];
+      this.persistStack();
+    }
+  }
+
+  // Push new route to router history tracker
+  public pushRoute(route: string, urlPath?: string): void {
+    const current = this.historyStack[this.historyStack.length - 1];
+    if (current !== route) {
+      this.historyStack.push(route);
+      this.persistStack();
+      this.notifyRoute(route);
+    }
+    if (typeof window !== 'undefined') {
+      const path = urlPath || (route === 'home' ? '/' : `/${route}`);
+      window.history.pushState({ route }, '', path);
+    }
+  }
+
+  // Ensure logical hierarchy for service details: ['services', serviceRoute]
+  public pushServiceRoute(serviceRoute: string, urlPath?: string): void {
+    // Filter out redundant occurrences
+    this.historyStack = this.historyStack.filter((r) => r !== serviceRoute && r !== 'services');
+    this.historyStack.push('services');
+    this.historyStack.push(serviceRoute);
+    this.persistStack();
+    this.notifyRoute(serviceRoute);
+
+    if (typeof window !== 'undefined') {
+      const path = urlPath || `/${serviceRoute}`;
+      window.history.pushState({ route: serviceRoute }, '', path);
+    }
+  }
+
+  // Strictly pop one step backward and return the target route
+  public popStep(): string | null {
+    if (this.historyStack.length > 1) {
+      this.historyStack.pop();
+      const prev = this.historyStack[this.historyStack.length - 1] || null;
+      this.persistStack();
+      if (prev) this.notifyRoute(prev);
+      return prev;
+    }
+    return null;
+  }
+
+  // Peek the immediate previous route
+  public peekPrevious(): string | null {
+    if (this.historyStack.length > 1) {
+      return this.historyStack[this.historyStack.length - 2];
+    }
+    return null;
+  }
+
+  // Get current history stack
+  public getHistoryStack(): string[] {
+    return [...this.historyStack];
+  }
+
+  // Set or replace history stack
+  public setHistoryStack(stack: string[]): void {
+    this.historyStack = [...stack];
+    this.persistStack();
+  }
+
+  private persistStack(): void {
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem('nhealth_router_history_stack', JSON.stringify(this.historyStack));
+      } catch {}
+    }
+  }
+
+  public onRoute(listener: (route: string) => void): () => void {
+    this.routeChangeListeners.push(listener);
+    return () => {
+      this.routeChangeListeners = this.routeChangeListeners.filter((l) => l !== listener);
+    };
+  }
+
+  private notifyRoute(route: string): void {
+    this.routeChangeListeners.forEach((l) => l(route));
   }
 
   // Register an open modal/popup/overlay
@@ -36,7 +134,6 @@ class NavigationHistoryManager {
       );
     } catch {}
 
-    // Return cleanup/close function for UI close triggers
     return () => this.popModal(id);
   }
 
@@ -47,7 +144,6 @@ class NavigationHistoryManager {
     const idx = this.modalStack.findIndex((m) => m.id === id);
     if (idx !== -1) {
       this.modalStack.splice(idx, 1);
-      // If the top state in history was a modal, pop it cleanly
       if (window.history.state?.isModal) {
         this.isProgrammaticBack = true;
         window.history.back();
@@ -112,21 +208,22 @@ class NavigationHistoryManager {
   }
 
   private handlePopState = (e: PopStateEvent) => {
-    // If this popstate was triggered by our programmatic history.back(), ignore
     if (this.isProgrammaticBack) {
       this.isProgrammaticBack = false;
       return;
     }
 
     // 1. POPUP / MODAL BACK-BUTTON BEHAVIOR:
-    // If a modal, popup, scan window, or overlay is open, pressing Back closes ONLY that modal
     if (this.hasOpenModals()) {
       this.closeTopModal();
-      // Keep user on the exact same underlying page
       return;
     }
 
-    // Otherwise, normal page/tab popstate is handled by the router
+    // 2. Strict stack alignment on popstate
+    if (this.historyStack.length > 1) {
+      this.historyStack.pop();
+      this.persistStack();
+    }
   };
 }
 

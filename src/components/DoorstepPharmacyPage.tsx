@@ -592,13 +592,22 @@ export const DoorstepPharmacyPage: React.FC<DoorstepPharmacyPageProps> = ({
     return notifications;
   }, [notifications, selectedNotifFilter]);
 
-  return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
-      {/* 1. TOP CORPORATE DARK BLUE HEADER & NAVIGATION */}
-      <header className="sticky top-0 z-50 bg-[#002b49] text-white shadow-md border-b border-[#003e6b]">
+  // Memoized sticky pharmacy header to isolate catalog scrolling and search state from re-rendering
+  const stickyHeader = useMemo(() => (
+    <header className="sticky top-0 z-50 bg-[#002b49] text-white shadow-md border-b border-[#003e6b]">
         <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-3">
-          {/* Left: Official Nhealth Logo & Title "Doorstep Pharmacy" ONLY */}
-          <div className="flex items-center gap-3">
+          {/* Left: Strict 1-step Back Button, Official Nhealth Logo & Title "Doorstep Pharmacy" */}
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <button
+              type="button"
+              onClick={onBackToHome}
+              className="p-1.5 sm:p-2 rounded-xl bg-[#001d31] hover:bg-[#003e6b] text-teal-300 hover:text-white border border-teal-500/20 transition-all cursor-pointer shadow-2xs active:scale-95"
+              aria-label="Back"
+              title="Back strictly one step"
+            >
+              <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+            <div className="h-5 w-px bg-slate-700/60 hidden sm:block" />
             <a
               href="https://ibb.co/SDYB7XbW"
               target="_blank"
@@ -769,22 +778,25 @@ export const DoorstepPharmacyPage: React.FC<DoorstepPharmacyPageProps> = ({
                 <button
                   onClick={() => {
                     setIsPharmacyMenuOpen(false);
-                    if (typeof window !== 'undefined' && window.history.length > 1) {
-                      window.history.back();
-                    } else {
-                      onBackToHome();
-                    }
+                    onBackToHome();
                   }}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-teal-300 hover:text-white text-xs sm:text-sm font-semibold transition-all border border-slate-700 cursor-pointer"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  <span>Back to Home</span>
+                  <span>Back strictly 1 step</span>
                 </button>
               </div>
             </div>
           </div>
         )}
       </header>
+    ),
+    [isPharmacyMenuOpen, unreadCount, totalCartItems, activeView, orders, isAuthorizedStaff, onBackToHome]
+  );
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
+      {stickyHeader}
 
       {/* ========================================================================= */}
       {/* VIEW 1: CATALOG & MEDICINES (Search, categories, products)                */}

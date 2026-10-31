@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Activity,
   Stethoscope,
@@ -81,6 +81,7 @@ import { TestimonialsCarousel } from './components/TestimonialsCarousel';
 import { PatientFeedbackModal } from './components/PatientFeedbackModal';
 import { HrPortalPage } from './components/HrPortalPage';
 import { PartnersPage } from './components/PartnersPage';
+import { ServicesListingPage } from './components/ServicesListingPage';
 import { FooterQuickLinksModal, QuickLinkType } from './components/FooterQuickLinksModal';
 import { usePatientInactivityRefresh } from './hooks/usePatientInactivityRefresh';
 import {
@@ -277,6 +278,7 @@ type RoutePath =
   | 'dashboard'
   | 'patient-dashboard'
   | 'teams'
+  | 'services'
   | 'online-consultation'
   | 'doorstep-pharmacy'
   | 'insurer'
@@ -294,6 +296,7 @@ export const VALID_ROUTES: RoutePath[] = [
   'dashboard',
   'patient-dashboard',
   'teams',
+  'services',
   'online-consultation',
   'doorstep-pharmacy',
   'insurer',
@@ -314,6 +317,28 @@ export const VALID_ROUTES: RoutePath[] = [
   'nhealth-careride',
   'nhealth-careassist',
 ];
+
+export const isServiceDetailRoute = (route?: string | null): boolean => {
+  if (!route) return false;
+  return [
+    'doctor-home-visits',
+    'home-diagnostics',
+    'xray-portable-diagnostics',
+    'bedside-assistance',
+    'eldercare-senior-assistance',
+    'specialized-nursing-care',
+    'physiotherapy-at-home',
+    'dental-care-oral-health',
+    'prepaid-premium-opd',
+    'diagnostics-advance-imaging',
+    'blood-bank-support',
+    'ambulance-24-7',
+    'nhealth-careride',
+    'nhealth-careassist',
+    'online-consultation',
+    'doorstep-pharmacy',
+  ].includes(route);
+};
 
 export const getServiceDedicatedRoute = (identifier?: string | null): DedicatedServiceKey | null => {
   if (!identifier) return null;
@@ -347,6 +372,7 @@ export function normalizeRoute(raw: string | null | undefined): RoutePath | null
   if (clean === 'patient' || clean === 'patient-portal' || clean === 'overview') return 'patient-dashboard';
   if (clean === 'partners' || clean === 'our-partners' || clean === 'healthcare-partners' || clean === 'diagnostic-partners') return 'partners';
   if (clean === 'partner') return 'partner-with-us';
+  if (clean === 'services' || clean === 'all-services' || clean === 'services-list' || clean === 'services-grid' || clean === 'healthcare-services') return 'services';
   if (clean === 'enquiry' || clean === 'enquiries' || clean === 'corporate') return 'corporate-enquiries';
   if (clean === 'online-consultation' || clean === 'consultation' || clean === 'online-doctor' || clean === 'online-doctor-consultation' || clean === 'doctor-consultation') return 'online-consultation';
   if (clean === 'doorstep-pharmacy' || clean === 'pharmacy' || clean === 'medicines' || clean === 'medicine' || clean === 'online-pharmacy') return 'doorstep-pharmacy';
@@ -499,13 +525,9 @@ export default function App() {
 
   // Centralized Route History Stack for Strict 1-Step Back Navigation
   const [routeHistory, setRouteHistory] = useState<RoutePath[]>(() => {
-    try {
-      const stored = sessionStorage.getItem('nhealth_route_history');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
+    const initialStack = navHistory.getHistoryStack() as RoutePath[];
+    if (initialStack && initialStack.length > 0) return initialStack;
+    navHistory.initStack(currentRoute);
     return [currentRoute];
   });
 
@@ -522,19 +544,13 @@ export default function App() {
         sessionStorage.setItem('nhealth_active_route', route);
       } catch {}
       if (!isBackAction) {
-        window.history.pushState({ route }, '', path);
+        navHistory.pushRoute(route, path);
       }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     if (!isBackAction && route !== currentRoute) {
-      setRouteHistory((prev) => {
-        const updated = [...prev, route];
-        try {
-          sessionStorage.setItem('nhealth_route_history', JSON.stringify(updated));
-        } catch {}
-        return updated;
-      });
+      setRouteHistory(navHistory.getHistoryStack() as RoutePath[]);
     }
 
     setCurrentRoute(route);
@@ -548,28 +564,34 @@ export default function App() {
       return;
     }
 
-    // 2. If browser history exists, use native back
-    if (typeof window !== 'undefined' && window.history.length > 1) {
-      window.history.back();
+    // 2. Strict Service Detail Back Navigation:
+    // When inside any service details view, back strictly takes user to 'services' (Services listing page)
+    if (isServiceDetailRoute(currentRoute)) {
+      navHistory.pushRoute('services', '/services');
+      setRouteHistory(navHistory.getHistoryStack() as RoutePath[]);
+      navigateTo('services', '/services', true);
       return;
     }
 
-    // 3. Fallback: pop strictly 1 route from application routeHistory stack
-    if (routeHistory.length > 1) {
-      const updated = [...routeHistory];
-      updated.pop(); // remove current route
-      const prevRoute = updated[updated.length - 1];
-      setRouteHistory(updated);
-      try {
-        sessionStorage.setItem('nhealth_route_history', JSON.stringify(updated));
-      } catch {}
-      if (prevRoute && prevRoute !== currentRoute) {
-        navigateTo(prevRoute, undefined, true);
-        return;
-      }
+    // 3. If on 'services' listing page, navigate back strictly to 'home' or logged-in dashboard
+    if (currentRoute === 'services') {
+      const parentRoute: RoutePath = isLoggedIn && (currentUser?.role === 'Patient' || currentUser?.accountType === 'Patient')
+        ? 'patient-dashboard'
+        : 'home';
+      navHistory.popStep();
+      navigateTo(parentRoute, parentRoute === 'home' ? '/' : `/${parentRoute}`, true);
+      return;
     }
 
-    // 4. Default 1-step back destination: user dashboard if logged in, else home
+    // 4. Pop strictly 1 route from centralized historyStack
+    const prevRoute = navHistory.popStep() as RoutePath | null;
+    if (prevRoute && prevRoute !== currentRoute && VALID_ROUTES.includes(prevRoute)) {
+      setRouteHistory(navHistory.getHistoryStack() as RoutePath[]);
+      navigateTo(prevRoute, undefined, true);
+      return;
+    }
+
+    // 5. Default 1-step back destination: user dashboard if logged in, else home
     const fallbackRoute: RoutePath = isLoggedIn && (currentUser?.role === 'Patient' || currentUser?.accountType === 'Patient')
       ? 'patient-dashboard'
       : 'home';
@@ -589,28 +611,26 @@ export default function App() {
         return;
       }
 
-      // 3. Resolve destination route from history state, hash, path, or localStorage
+      // 3. Resolve destination route from history state, stack, or URL
       let destRoute: RoutePath = 'home';
       if (e.state?.route && VALID_ROUTES.includes(e.state.route)) {
         destRoute = e.state.route;
       } else {
-        destRoute = getRouteFromLocation();
+        const stackTarget = navHistory.getHistoryStack()[navHistory.getHistoryStack().length - 1];
+        if (stackTarget && VALID_ROUTES.includes(stackTarget as RoutePath)) {
+          destRoute = stackTarget as RoutePath;
+        } else {
+          destRoute = getRouteFromLocation();
+        }
       }
 
-      // Sync routeHistory stack on popstate so it stays aligned with browser history
-      setRouteHistory((prev) => {
-        if (destRoute && prev.length > 1) {
-          const idx = prev.lastIndexOf(destRoute);
-          if (idx !== -1) {
-            const trimmed = prev.slice(0, idx + 1);
-            try {
-              sessionStorage.setItem('nhealth_route_history', JSON.stringify(trimmed));
-            } catch {}
-            return trimmed;
-          }
-        }
-        return prev;
-      });
+      // If user is stepping back from a service detail page and browser history pops to home or empty,
+      // strictly enforce one-step back to the Services listing page (/services)
+      if (isServiceDetailRoute(currentRoute) && (destRoute === 'home' || !destRoute)) {
+        destRoute = 'services';
+      }
+
+      setRouteHistory(navHistory.getHistoryStack() as RoutePath[]);
 
       // If destRoute is known and differs from current view, take strictly 1 step back to that view
       if (destRoute && destRoute !== currentRoute) {
@@ -1598,17 +1618,20 @@ export default function App() {
   };
 
   const openBookingFor = (serviceName: string) => {
+    let targetRoute: RoutePath | null = null;
     if (isOnlineDoctorConsultation(serviceName)) {
-      navigateTo('online-consultation', '/online-consultation');
-      return;
+      targetRoute = 'online-consultation';
+    } else if (isDoorstepPharmacy(serviceName)) {
+      targetRoute = 'doorstep-pharmacy';
+    } else {
+      targetRoute = getServiceDedicatedRoute(serviceName);
     }
-    if (isDoorstepPharmacy(serviceName)) {
-      navigateTo('doorstep-pharmacy', '/doorstep-pharmacy');
-      return;
-    }
-    const dedicatedRoute = getServiceDedicatedRoute(serviceName);
-    if (dedicatedRoute) {
-      navigateTo(dedicatedRoute, `/${dedicatedRoute}`);
+
+    if (targetRoute) {
+      const target: RoutePath = targetRoute;
+      navHistory.pushServiceRoute(target, `/${target}`);
+      setRouteHistory(navHistory.getHistoryStack() as RoutePath[]);
+      navigateTo(target, `/${target}`);
       return;
     }
     const sNameLower = serviceName.toLowerCase();
@@ -1861,6 +1884,16 @@ export default function App() {
         onPromptLogin={() => navigateTo('auth', '/auth')}
         onBackToHome={navigateBack}
         onOpenBookingModal={(serviceName) => openBookingFor(serviceName)}
+      />
+    );
+  }
+
+  if (currentRoute === 'services') {
+    return (
+      <ServicesListingPage
+        onBack={navigateBack}
+        onSelectService={openBookingFor}
+        partners={partners}
       />
     );
   }
@@ -2134,13 +2167,10 @@ export default function App() {
               onMouseLeave={() => setServicesDropdownHover(false)}
             >
               <a
-                href="#services-grid"
+                href="/services"
                 onClick={(e) => {
-                  if (currentRoute !== 'home') {
-                    e.preventDefault();
-                    navigateTo('home', '/');
-                    setTimeout(scrollToServicesGrid, 150);
-                  }
+                  e.preventDefault();
+                  navigateTo('services', '/services');
                 }}
                 className="inline-flex items-center gap-1 hover:text-[#008080] transition-colors py-1.5 px-1.5 xl:px-2 rounded-lg whitespace-nowrap shrink-0"
               >
@@ -2353,14 +2383,17 @@ export default function App() {
               >
                 Home
               </a>
-              <a
-                href="#services"
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-sm font-semibold text-slate-800 hover:text-[#008080] py-1.5 flex items-center justify-between"
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  navigateTo('services', '/services');
+                }}
+                className="w-full text-left text-sm font-semibold text-slate-800 hover:text-[#008080] py-1.5 flex items-center justify-between cursor-pointer"
               >
                 <span>Services (16 Unified Offerings)</span>
                 <span className="text-[10px] font-bold text-[#008080] bg-teal-50 px-2 py-0.5 rounded-full">All Available</span>
-              </a>
+              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -4985,8 +5018,15 @@ export default function App() {
                   </a>
                 </li>
                 <li>
-                  <a href="#services-grid" className="hover:text-white transition-colors">
-                    Services
+                  <a
+                    href="/services"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      navigateTo('services', '/services');
+                    }}
+                    className="hover:text-white transition-colors"
+                  >
+                    Services (16 Unified)
                   </a>
                 </li>
                 <li>
