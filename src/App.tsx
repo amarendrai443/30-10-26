@@ -389,64 +389,64 @@ export function normalizeRoute(raw: string | null | undefined): RoutePath | null
 export function getRouteFromLocation(): RoutePath {
   if (typeof window === 'undefined') return 'home';
 
-  // 1. Check logged in user account type: if a Patient session exists, prioritize landing directly on the Patient Overview dashboard
+  // 1. Check logged in user account type: block landing/hero page when logged in
   try {
     const savedUser = localStorage.getItem('nhealth_user');
     if (savedUser) {
       const user = JSON.parse(savedUser);
-      if (user?.role === 'Patient' || user?.accountType === 'Patient') {
-        const fromHash = window.location.hash ? normalizeRoute(window.location.hash) : null;
-        const fromPath = window.location.pathname && window.location.pathname !== '/'
-          ? normalizeRoute(window.location.pathname)
-          : null;
+      const isPatient = user?.role === 'Patient' || user?.accountType === 'Patient';
+      const defaultDashboard: RoutePath = isPatient ? 'patient-dashboard' : 'dashboard';
 
-        // If explicitly requesting another distinct page during session (e.g. partner-with-us, corporate-enquiries, online-consultation)
-        if (fromHash && fromHash !== 'patient-dashboard' && fromHash !== 'home' && fromHash !== 'dashboard' && fromHash !== 'auth') {
-          return fromHash;
-        }
-        if (fromPath && fromPath !== 'patient-dashboard' && fromPath !== 'home' && fromPath !== 'dashboard' && fromPath !== 'auth') {
-          return fromPath;
-        }
-        // Startup, fresh session, or reopening persistent login session lands directly on patient-dashboard Overview
-        return 'patient-dashboard';
+      const fromHash = window.location.hash ? normalizeRoute(window.location.hash) : null;
+      const fromPath = window.location.pathname && window.location.pathname !== '/'
+        ? normalizeRoute(window.location.pathname)
+        : null;
+
+      // Allow access to dedicated sub-pages during active session (services, teams, partner-with-us, etc.)
+      if (fromHash && fromHash !== 'home' && fromHash !== 'auth') {
+        return fromHash;
       }
-      if (user?.role && user.role !== 'Patient') {
-        return 'dashboard';
+      if (fromPath && fromPath !== 'home' && fromPath !== 'auth') {
+        return fromPath;
       }
+
+      // POST-LOGIN HERO RESTRICTION: Never allow redirect to hero/landing page while authenticated
+      return defaultDashboard;
     }
   } catch {}
 
-  // 2. Check window.location.hash (e.g. #/patient-dashboard, #patient-dashboard, #teams)
+  // 2. Unauthenticated check: block entering authenticated dashboards without fresh login
+  const rawTarget = window.location.hash
+    ? normalizeRoute(window.location.hash)
+    : (window.location.pathname !== '/' ? normalizeRoute(window.location.pathname) : null);
+  if (rawTarget === 'patient-dashboard' || rawTarget === 'dashboard') {
+    return 'home';
+  }
+
+  // 3. Check window.location.hash (e.g. #/teams, #services)
   if (window.location.hash) {
     const fromHash = normalizeRoute(window.location.hash);
-    if (fromHash) return fromHash;
+    if (fromHash && fromHash !== 'patient-dashboard' && fromHash !== 'dashboard') return fromHash;
   }
 
-  // 3. Check window.location.pathname (e.g. /patient-dashboard, /teams)
+  // 4. Check window.location.pathname (e.g. /teams, /services)
   if (window.location.pathname && window.location.pathname !== '/') {
     const fromPath = normalizeRoute(window.location.pathname);
-    if (fromPath) return fromPath;
+    if (fromPath && fromPath !== 'patient-dashboard' && fromPath !== 'dashboard') return fromPath;
   }
 
-  // 4. Check URL query parameters (e.g. ?p=patient-dashboard or ?route=...)
+  // 5. Check URL query parameters (e.g. ?p=services or ?route=...)
   try {
     const params = new URLSearchParams(window.location.search);
     const qRoute = normalizeRoute(params.get('route') || params.get('p') || params.get('page'));
-    if (qRoute) return qRoute;
+    if (qRoute && qRoute !== 'patient-dashboard' && qRoute !== 'dashboard') return qRoute;
   } catch {}
 
-  // 5. Check localStorage for persisted active route
+  // 6. Check localStorage for persisted active route (if not protected dashboard)
   try {
     const savedLocal = localStorage.getItem('nhealth_active_route');
     const validLocal = normalizeRoute(savedLocal);
-    if (validLocal) return validLocal;
-  } catch {}
-
-  // 6. Check sessionStorage for fallback
-  try {
-    const savedSession = sessionStorage.getItem('nhealth_active_route');
-    const validSession = normalizeRoute(savedSession);
-    if (validSession) return validSession;
+    if (validLocal && validLocal !== 'patient-dashboard' && validLocal !== 'dashboard') return validLocal;
   } catch {}
 
   return 'home';
@@ -532,28 +532,42 @@ export default function App() {
   });
 
   const navigateTo = (route: RoutePath, urlPath?: string, isBackAction = false) => {
+    let target = route;
+
+    // 1. POST-LOGIN HERO RESTRICTION: Block any automatic or accidental redirection to landing/hero page
+    if (isLoggedIn && target === 'home') {
+      target = (currentUser?.role === 'Patient' || currentUser?.accountType === 'Patient')
+        ? 'patient-dashboard'
+        : 'dashboard';
+    }
+
+    // 2. UNAUTHENTICATED DASHBOARD SHIELD: Block entering protected dashboards when logged out
+    if (!isLoggedIn && (target === 'patient-dashboard' || target === 'dashboard' || target === 'command-center')) {
+      target = 'auth';
+    }
+
     let path = urlPath;
     if (!path) {
-      if (route === 'home') path = '/';
-      else if (route === 'teams') path = '/teams';
-      else path = `/${route}`;
+      if (target === 'home') path = '/';
+      else if (target === 'teams') path = '/teams';
+      else path = `/${target}`;
     }
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem('nhealth_active_route', route);
-        sessionStorage.setItem('nhealth_active_route', route);
+        localStorage.setItem('nhealth_active_route', target);
+        sessionStorage.setItem('nhealth_active_route', target);
       } catch {}
       if (!isBackAction) {
-        navHistory.pushRoute(route, path);
+        navHistory.pushRoute(target, path);
       }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    if (!isBackAction && route !== currentRoute) {
+    if (!isBackAction && target !== currentRoute) {
       setRouteHistory(navHistory.getHistoryStack() as RoutePath[]);
     }
 
-    setCurrentRoute(route);
+    setCurrentRoute(target);
   };
 
   // Strict 1-step back navigation function across all modules
@@ -573,10 +587,10 @@ export default function App() {
       return;
     }
 
-    // 3. If on 'services' listing page, navigate back strictly to 'home' or logged-in dashboard
+    // 3. If on 'services' listing page, navigate back strictly to user dashboard or home
     if (currentRoute === 'services') {
-      const parentRoute: RoutePath = isLoggedIn && (currentUser?.role === 'Patient' || currentUser?.accountType === 'Patient')
-        ? 'patient-dashboard'
+      const parentRoute: RoutePath = isLoggedIn
+        ? (currentUser?.role === 'Patient' || currentUser?.accountType === 'Patient' ? 'patient-dashboard' : 'dashboard')
         : 'home';
       navHistory.popStep();
       navigateTo(parentRoute, parentRoute === 'home' ? '/' : `/${parentRoute}`, true);
@@ -584,7 +598,16 @@ export default function App() {
     }
 
     // 4. Pop strictly 1 route from centralized historyStack
-    const prevRoute = navHistory.popStep() as RoutePath | null;
+    let prevRoute = navHistory.popStep() as RoutePath | null;
+    if (isLoggedIn && prevRoute === 'home') {
+      prevRoute = (currentUser?.role === 'Patient' || currentUser?.accountType === 'Patient')
+        ? 'patient-dashboard'
+        : 'dashboard';
+    }
+    if (!isLoggedIn && (prevRoute === 'patient-dashboard' || prevRoute === 'dashboard' || prevRoute === 'command-center')) {
+      prevRoute = 'home';
+    }
+
     if (prevRoute && prevRoute !== currentRoute && VALID_ROUTES.includes(prevRoute)) {
       setRouteHistory(navHistory.getHistoryStack() as RoutePath[]);
       navigateTo(prevRoute, undefined, true);
@@ -592,8 +615,8 @@ export default function App() {
     }
 
     // 5. Default 1-step back destination: user dashboard if logged in, else home
-    const fallbackRoute: RoutePath = isLoggedIn && (currentUser?.role === 'Patient' || currentUser?.accountType === 'Patient')
-      ? 'patient-dashboard'
+    const fallbackRoute: RoutePath = isLoggedIn
+      ? (currentUser?.role === 'Patient' || currentUser?.accountType === 'Patient' ? 'patient-dashboard' : 'dashboard')
       : 'home';
     navigateTo(fallbackRoute, fallbackRoute === 'home' ? '/' : `/${fallbackRoute}`, true);
   };
@@ -628,6 +651,21 @@ export default function App() {
       // strictly enforce one-step back to the Services listing page (/services)
       if (isServiceDetailRoute(currentRoute) && (destRoute === 'home' || !destRoute)) {
         destRoute = 'services';
+      }
+
+      // POST-LOGIN HERO RESTRICTION: Block popstate landing on hero page while authenticated
+      if (isLoggedIn && (destRoute === 'home' || !destRoute)) {
+        destRoute = (currentUser?.role === 'Patient' || currentUser?.accountType === 'Patient')
+          ? 'patient-dashboard'
+          : 'dashboard';
+      }
+
+      // POST-LOGOUT HISTORY PROTECTION: Block popstate back into authenticated dashboards
+      if (!isLoggedIn && (destRoute === 'patient-dashboard' || destRoute === 'dashboard' || destRoute === 'command-center')) {
+        destRoute = 'home';
+        if (typeof window !== 'undefined') {
+          window.history.replaceState({ route: 'home', isLoggedOut: true }, '', '/');
+        }
       }
 
       setRouteHistory(navHistory.getHistoryStack() as RoutePath[]);
@@ -1095,9 +1133,52 @@ export default function App() {
     if (showPwaInstallModal) return navHistory.pushModal('pwaInstall', 'PWA Install Prompt', () => setShowPwaInstallModal(false));
   }, [showPwaInstallModal]);
 
+  // Mobile drawer keyboard & popstate dismissal without corrupting route history stack
   useEffect(() => {
-    if (mobileMenuOpen) return navHistory.pushModal('mobileMenu', 'Mobile Menu', () => setMobileMenuOpen(false));
+    if (!mobileMenuOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileMenuOpen(false);
+    };
+    const handlePop = () => {
+      setMobileMenuOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('popstate', handlePop, { once: true });
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('popstate', handlePop);
+    };
   }, [mobileMenuOpen]);
+
+  // Prevent double-click, double-tap & rapid event firing in mobile navigation
+  const lastMenuToggleTimeRef = useRef(0);
+  const isMenuNavigatingRef = useRef(false);
+
+  const toggleMobileMenu = useCallback((e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const now = Date.now();
+    if (now - lastMenuToggleTimeRef.current < 280) return;
+    lastMenuToggleTimeRef.current = now;
+    setMobileMenuOpen((prev) => !prev);
+  }, []);
+
+  const handleMobileNav = useCallback((e: React.MouseEvent, action: () => void) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isMenuNavigatingRef.current) return;
+    isMenuNavigatingRef.current = true;
+    setMobileMenuOpen(false);
+    try {
+      action();
+    } finally {
+      setTimeout(() => {
+        isMenuNavigatingRef.current = false;
+      }, 350);
+    }
+  }, []);
 
   // Continuous horizontal auto-scroll & interactive drag controls for services section (Desktop & Mobile)
   const servicesMarqueeRef = useRef<HTMLDivElement | null>(null);
@@ -1461,9 +1542,23 @@ export default function App() {
     try {
       localStorage.removeItem('nhealth_user');
       sessionStorage.removeItem('nhealth_user');
+      localStorage.removeItem('nhealth_active_route');
+      sessionStorage.removeItem('nhealth_active_route');
+      localStorage.removeItem('nhealth_patient_tab');
+      sessionStorage.removeItem('nhealth_patient_tab');
+      localStorage.removeItem('nhealth_admin_authenticated');
+      sessionStorage.removeItem('nhealth_admin_authenticated');
+      sessionStorage.removeItem('nhealth_router_history_stack');
+      sessionStorage.removeItem('nhealth_route_history');
     } catch {}
+
+    navHistory.setHistoryStack(['home']);
+    setRouteHistory(['home']);
+
     if (typeof window !== 'undefined') {
-      window.history.pushState({}, '', '/');
+      // POST-LOGOUT BROWSER HISTORY PROTECTION:
+      // Replace browser history state so clicking Back cannot return to authenticated dashboards
+      window.history.replaceState({ route: 'home', isLoggedOut: true }, '', '/');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
     setCurrentRoute('home');
@@ -2001,7 +2096,11 @@ export default function App() {
     );
   }
 
-  if (currentRoute === 'dashboard') {
+  if (currentRoute === 'dashboard' || (isLoggedIn && currentUser?.role && currentUser.role !== 'Patient' && currentUser.accountType !== 'Patient' && currentRoute === 'home')) {
+    if (!isLoggedIn) {
+      navigateTo('auth', '/auth', true);
+      return null;
+    }
     const fallbackUser: UserAccount = {
       id: 'USR-88210',
       name: 'Ramesh Kumar',
@@ -2017,13 +2116,12 @@ export default function App() {
           currentUser={currentUser || fallbackUser}
           allPartners={partners}
           onLogout={handleLogout}
-          onNavigateHome={() => navigateTo('home', '/')}
+          onNavigateHome={() => {
+            // Stay within Dashboard - block redirection to Hero page
+            setCurrentRoute('dashboard');
+          }}
           onNavigateBooking={(serviceName) => {
-            navigateTo('home', '/');
-            setTimeout(() => {
-              const el = document.getElementById('services-grid');
-              if (el) el.scrollIntoView({ behavior: 'smooth' });
-            }, 100);
+            openBookingFor(serviceName || 'Home Diagnostics');
           }}
           onSwitchRole={(newRole) => {
             if (currentUser) {
@@ -2044,7 +2142,11 @@ export default function App() {
     );
   }
 
-  if (currentRoute === 'patient-dashboard' || (isLoggedIn && (currentUser?.role === 'Patient' || currentUser?.accountType === 'Patient'))) {
+  if (currentRoute === 'patient-dashboard' || (isLoggedIn && (currentUser?.role === 'Patient' || currentUser?.accountType === 'Patient' || !currentUser?.role))) {
+    if (!isLoggedIn) {
+      navigateTo('auth', '/auth', true);
+      return null;
+    }
     return (
       <>
         <PatientDashboardPage
@@ -2100,6 +2202,15 @@ export default function App() {
         <NotificationPermissionPrompt />
       </>
     );
+  }
+
+  // Strict Post-Login Hero Page Restriction:
+  // If user is logged in, block any automatic or accidental render of the hero landing page
+  if (isLoggedIn) {
+    const isPatient = !currentUser?.role || currentUser.role === 'Patient' || currentUser.accountType === 'Patient';
+    const fallbackRoute: RoutePath = isPatient ? 'patient-dashboard' : 'dashboard';
+    navigateTo(fallbackRoute, `/${fallbackRoute}`, true);
+    return null;
   }
 
   // Triplicate active items array for bidirectional seamless infinite marquee loop & drag wrapping
@@ -2360,12 +2471,13 @@ export default function App() {
               </button>
             )}
 
-            {/* Mobile Menu Toggle Button - 100% visible, fully touchable */}
+            {/* Mobile Menu Toggle Button - 100% visible, debounced touch handling */}
             <button
               type="button"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden w-10 h-10 flex items-center justify-center text-slate-700 hover:text-[#008080] hover:bg-slate-100 active:bg-slate-200 rounded-xl transition-colors cursor-pointer shrink-0 border border-slate-200/80 sm:border-transparent z-10"
+              onClick={toggleMobileMenu}
+              className="lg:hidden w-10 h-10 flex items-center justify-center text-slate-700 hover:text-[#008080] hover:bg-slate-100 active:bg-slate-200 rounded-xl transition-colors cursor-pointer shrink-0 border border-slate-200/80 sm:border-transparent z-10 touch-manipulation"
               aria-label="Toggle Navigation Menu"
+              aria-expanded={mobileMenuOpen}
             >
               {mobileMenuOpen ? <X className="w-5 h-5 text-slate-800" /> : <Menu className="w-5 h-5 text-slate-800" />}
             </button>
@@ -2376,19 +2488,27 @@ export default function App() {
         {mobileMenuOpen && (
           <div className="lg:hidden bg-white border-t border-slate-200 px-4 py-5 shadow-xl animate-in slide-in-from-top-2 duration-200 max-h-[80vh] overflow-y-auto">
             <div className="flex flex-col space-y-3 pb-4 border-b border-slate-100">
-              <a
-                href="#home"
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-sm font-semibold text-slate-800 hover:text-[#008080] py-1.5"
-              >
-                Home
-              </a>
               <button
                 type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  navigateTo('services', '/services');
-                }}
+                onClick={(e) =>
+                  handleMobileNav(e, () => {
+                    if (currentRoute !== 'home') {
+                      navigateTo('home', '/');
+                    }
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  })
+                }
+                className="w-full text-left text-sm font-semibold text-slate-800 hover:text-[#008080] py-1.5 cursor-pointer"
+              >
+                Home
+              </button>
+              <button
+                type="button"
+                onClick={(e) =>
+                  handleMobileNav(e, () => {
+                    navigateTo('services', '/services');
+                  })
+                }
                 className="w-full text-left text-sm font-semibold text-slate-800 hover:text-[#008080] py-1.5 flex items-center justify-between cursor-pointer"
               >
                 <span>Services (16 Unified Offerings)</span>
@@ -2396,10 +2516,11 @@ export default function App() {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  navigateTo('doorstep-pharmacy', '/doorstep-pharmacy');
-                }}
+                onClick={(e) =>
+                  handleMobileNav(e, () => {
+                    navigateTo('doorstep-pharmacy', '/doorstep-pharmacy');
+                  })
+                }
                 className="w-full text-left text-sm font-semibold text-slate-800 hover:text-[#008080] py-1.5 cursor-pointer flex items-center justify-between"
               >
                 <span>Doorstep Pharmacy</span>
@@ -2409,10 +2530,11 @@ export default function App() {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  navigateTo('online-consultation', '/online-consultation');
-                }}
+                onClick={(e) =>
+                  handleMobileNav(e, () => {
+                    navigateTo('online-consultation', '/online-consultation');
+                  })
+                }
                 className="w-full text-left text-sm font-semibold text-slate-800 hover:text-[#008080] py-1.5 cursor-pointer flex items-center justify-between"
               >
                 <span>Online Doctor Consultation</span>
@@ -2420,46 +2542,86 @@ export default function App() {
                   Video / Call
                 </span>
               </button>
-              <a
-                href="#how-it-works"
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-sm font-semibold text-slate-800 hover:text-[#008080] py-1.5"
-              >
-                How It Works
-              </a>
-              <a
-                href="#about-us"
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-sm font-semibold text-slate-800 hover:text-[#008080] py-1.5"
-              >
-                About Us
-              </a>
               <button
                 type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  navigateTo('teams', '#teams');
-                }}
+                onClick={(e) =>
+                  handleMobileNav(e, () => {
+                    if (currentRoute !== 'home') {
+                      navigateTo('home', '/');
+                      setTimeout(() => {
+                        const el = document.getElementById('how-it-works');
+                        if (el) el.scrollIntoView({ behavior: 'smooth' });
+                      }, 150);
+                    } else {
+                      const el = document.getElementById('how-it-works');
+                      if (el) el.scrollIntoView({ behavior: 'smooth' });
+                    }
+                  })
+                }
+                className="w-full text-left text-sm font-semibold text-slate-800 hover:text-[#008080] py-1.5 cursor-pointer"
+              >
+                How It Works
+              </button>
+              <button
+                type="button"
+                onClick={(e) =>
+                  handleMobileNav(e, () => {
+                    if (currentRoute !== 'home') {
+                      navigateTo('home', '/');
+                      setTimeout(() => {
+                        const el = document.getElementById('about-us');
+                        if (el) el.scrollIntoView({ behavior: 'smooth' });
+                      }, 150);
+                    } else {
+                      const el = document.getElementById('about-us');
+                      if (el) el.scrollIntoView({ behavior: 'smooth' });
+                    }
+                  })
+                }
+                className="w-full text-left text-sm font-semibold text-slate-800 hover:text-[#008080] py-1.5 cursor-pointer"
+              >
+                About Us
+              </button>
+              <button
+                type="button"
+                onClick={(e) =>
+                  handleMobileNav(e, () => {
+                    navigateTo('teams', '/teams');
+                  })
+                }
                 className="w-full text-left text-sm font-semibold text-slate-800 hover:text-[#008080] py-1.5 cursor-pointer"
               >
                 Teams
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  navigateTo('corporate-enquiries', '/corporate-enquiries');
-                }}
+                onClick={(e) =>
+                  handleMobileNav(e, () => {
+                    navigateTo('corporate-enquiries', '/corporate-enquiries');
+                  })
+                }
                 className="w-full text-left text-sm font-semibold text-slate-800 hover:text-[#008080] py-1.5 cursor-pointer"
               >
                 Corporate Enquiries
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  handleOpenQuickLink('medical-tourism');
-                }}
+                onClick={(e) =>
+                  handleMobileNav(e, () => {
+                    navigateTo('partners', '/partners');
+                  })
+                }
+                className="w-full text-left text-sm font-semibold text-slate-800 hover:text-[#008080] py-1.5 cursor-pointer"
+              >
+                Our Healthcare Partners
+              </button>
+              <button
+                type="button"
+                onClick={(e) =>
+                  handleMobileNav(e, () => {
+                    handleOpenQuickLink('medical-tourism');
+                  })
+                }
                 className="w-full text-left text-sm font-semibold text-slate-800 hover:text-[#008080] py-1.5 cursor-pointer flex items-center justify-between"
               >
                 <span>Medical Tourism</span>
@@ -2467,23 +2629,37 @@ export default function App() {
                   Global Concierge
                 </span>
               </button>
-              <a
-                href="#contact"
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-sm font-semibold text-slate-800 hover:text-[#008080] py-1.5"
+              <button
+                type="button"
+                onClick={(e) =>
+                  handleMobileNav(e, () => {
+                    if (currentRoute !== 'home') {
+                      navigateTo('home', '/');
+                      setTimeout(() => {
+                        const el = document.getElementById('contact');
+                        if (el) el.scrollIntoView({ behavior: 'smooth' });
+                      }, 150);
+                    } else {
+                      const el = document.getElementById('contact');
+                      if (el) el.scrollIntoView({ behavior: 'smooth' });
+                    }
+                  })
+                }
+                className="w-full text-left text-sm font-semibold text-slate-800 hover:text-[#008080] py-1.5 cursor-pointer"
               >
                 Contact Us
-              </a>
+              </button>
             </div>
 
             <div className="pt-4 flex flex-col gap-2.5">
               {/* Mobile Drawer AI Face Vitals Scan */}
               <button
                 type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  setVitalLensOpen(true);
-                }}
+                onClick={(e) =>
+                  handleMobileNav(e, () => {
+                    setVitalLensOpen(true);
+                  })
+                }
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-gradient-to-r from-purple-700 via-fuchsia-700 to-indigo-800 text-white text-xs font-bold shadow-md cursor-pointer"
               >
                 <Activity className="w-4 h-4 text-purple-200 animate-pulse" />
@@ -2492,10 +2668,11 @@ export default function App() {
 
               <button
                 type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  navigateTo('partner-with-us', '/partner-with-us');
-                }}
+                onClick={(e) =>
+                  handleMobileNav(e, () => {
+                    navigateTo('partner-with-us', '/partner-with-us');
+                  })
+                }
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-[#002b49]/30 text-[#002b49] text-xs font-semibold hover:bg-slate-50 cursor-pointer"
               >
                 <Building2 className="w-4 h-4 text-[#008080]" />
@@ -2508,10 +2685,11 @@ export default function App() {
                   {currentUser.role !== 'Patient' && currentUser.accountType !== 'Patient' && (
                     <button
                       type="button"
-                      onClick={() => {
-                        setMobileMenuOpen(false);
-                        navigateTo('dashboard', '/dashboard');
-                      }}
+                      onClick={(e) =>
+                        handleMobileNav(e, () => {
+                          navigateTo('dashboard', '/dashboard');
+                        })
+                      }
                       className="w-full flex items-center justify-between py-2.5 px-3 rounded-lg bg-teal-50 hover:bg-teal-100 text-[#008080] border border-teal-200 text-xs font-bold cursor-pointer"
                     >
                       <span className="flex items-center gap-2">
@@ -2525,10 +2703,11 @@ export default function App() {
                   )}
                   <button
                     type="button"
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      setMyBookingsModalOpen(true);
-                    }}
+                    onClick={(e) =>
+                      handleMobileNav(e, () => {
+                        setMyBookingsModalOpen(true);
+                      })
+                    }
                     className="w-full flex items-center justify-between py-2 px-3 rounded-lg border border-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
                   >
                     <span>My Bookings &amp; Reports</span>
@@ -2540,10 +2719,11 @@ export default function App() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      handleLogout();
-                    }}
+                    onClick={(e) =>
+                      handleMobileNav(e, () => {
+                        handleLogout();
+                      })
+                    }
                     className="w-full py-2 text-center text-xs font-semibold text-slate-500 hover:text-red-600 transition-colors cursor-pointer"
                   >
                     Logout Account
@@ -2552,11 +2732,12 @@ export default function App() {
               ) : (
                 <button
                   type="button"
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    navigateTo('auth', '/auth');
-                  }}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-[#002b49] hover:bg-[#001f35] text-white text-xs font-semibold cursor-pointer"
+                  onClick={(e) =>
+                    handleMobileNav(e, () => {
+                      navigateTo('auth', '/auth');
+                    })
+                  }
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-[#002b49] hover:bg-[#001f35] text-white text-xs font-semibold cursor-pointer shadow-sm"
                 >
                   <User className="w-4 h-4 text-white" />
                   <span>Patient Login &amp; Registration (/auth)</span>

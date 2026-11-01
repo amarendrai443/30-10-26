@@ -209,11 +209,11 @@ export const CorporateEnquiriesPage: React.FC<CorporateEnquiriesPageProps> = ({
                     onNavigateHome();
                   }
                 }}
-                className="p-1.5 rounded-lg text-slate-700 hover:text-[#008080] hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200"
-                title="Back strictly one step"
-                aria-label="Back"
+                className="p-1 text-slate-700 hover:text-[#008080] transition-colors cursor-pointer shrink-0"
+                title="Go back"
+                aria-label="Go back"
               >
-                <ArrowLeft className="w-4 h-4" />
+                <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
               <a
                 href="https://ibb.co/SDYB7XbW"
@@ -258,11 +258,11 @@ export const CorporateEnquiriesPage: React.FC<CorporateEnquiriesPageProps> = ({
                     onNavigateHome();
                   }
                 }}
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-[#008080] transition-colors p-1.5 -ml-1.5 rounded-lg hover:bg-slate-100 cursor-pointer"
-                title="Back strictly one step"
+                className="p-1 text-slate-700 hover:text-[#008080] transition-colors cursor-pointer shrink-0"
+                title="Go back"
+                aria-label="Go back"
               >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Back</span>
+                <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
 
               <div className="h-6 w-px bg-slate-200" />
@@ -335,10 +335,11 @@ export const CorporateEnquiriesPage: React.FC<CorporateEnquiriesPageProps> = ({
                   setIsMobileMenuOpen(false);
                   onNavigateHome();
                 }}
-                className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 hover:text-[#008080] hover:bg-slate-50 transition-colors text-left cursor-pointer"
+                className="p-1 text-slate-700 hover:text-[#008080] transition-colors cursor-pointer shrink-0"
+                aria-label="Go back"
+                title="Go back"
               >
-                <ArrowLeft className="w-4 h-4 text-teal-600 shrink-0" />
-                <span>Back to Patient Portal &amp; Home</span>
+                <ArrowLeft className="w-5 h-5 text-teal-600" />
               </button>
 
               <button

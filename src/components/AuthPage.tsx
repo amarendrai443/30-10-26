@@ -1328,11 +1328,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   onNavigateHome();
                 }
               }}
-              aria-label="Back strictly one step"
-              title="Back"
-              className="inline-flex items-center justify-center w-10 h-10 rounded-xl text-slate-700 hover:text-[#008080] hover:bg-slate-100 active:bg-slate-200 transition-colors cursor-pointer shrink-0 border border-slate-200/60 sm:border-transparent"
+              aria-label="Go back"
+              title="Go back"
+              className="p-1 text-slate-700 hover:text-[#008080] transition-colors cursor-pointer shrink-0"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
           </div>
 

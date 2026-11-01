@@ -264,11 +264,11 @@ export const TeamsPage: React.FC<TeamsPageProps> = ({
                     onNavigateHome();
                   }
                 }}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-slate-700 hover:text-[#008080] bg-slate-100 hover:bg-slate-200/80 rounded-xl transition-all cursor-pointer"
-                title="Back strictly one step"
+                className="p-1 text-slate-700 hover:text-[#008080] transition-colors cursor-pointer shrink-0"
+                aria-label="Go back"
+                title="Go back"
               >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Back</span>
+                <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
 
               {onNavigateCorporate && (
@@ -312,10 +312,11 @@ export const TeamsPage: React.FC<TeamsPageProps> = ({
                   setIsMobileMenuOpen(false);
                   onNavigateHome();
                 }}
-                className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 hover:text-[#008080] hover:bg-slate-50 transition-colors text-left cursor-pointer"
+                className="p-1 text-slate-700 hover:text-[#008080] transition-colors cursor-pointer shrink-0"
+                aria-label="Go back"
+                title="Go back"
               >
-                <ArrowLeft className="w-4 h-4 text-teal-600 shrink-0" />
-                <span>Back to Patient Portal &amp; Home</span>
+                <ArrowLeft className="w-5 h-5 text-teal-600" />
               </button>
 
               <button

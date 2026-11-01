@@ -476,11 +476,13 @@ export const HrPortalPage: React.FC<HrPortalPageProps> = ({ onNavigateHome, onNa
 
           <div className="mt-6 text-center">
             <button
+              type="button"
               onClick={onNavigateHome}
-              className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-teal-300 transition-colors cursor-pointer"
+              className="p-1 text-slate-400 hover:text-teal-300 transition-colors cursor-pointer inline-flex items-center"
+              aria-label="Go back"
+              title="Go back"
             >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Return to Nhealth Homepage
+              <ArrowLeft className="w-5 h-5" />
             </button>
           </div>
         </div>
@@ -499,6 +501,7 @@ export const HrPortalPage: React.FC<HrPortalPageProps> = ({ onNavigateHome, onNa
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
+              type="button"
               onClick={() => {
                 if (typeof window !== 'undefined' && window.history.length > 1) {
                   window.history.back();
@@ -506,10 +509,11 @@ export const HrPortalPage: React.FC<HrPortalPageProps> = ({ onNavigateHome, onNa
                   onNavigateHome();
                 }
               }}
-              className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
-              title="Back strictly one step"
+              className="p-1 text-slate-300 hover:text-white transition-colors cursor-pointer shrink-0"
+              aria-label="Go back"
+              title="Go back"
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
             <a
               href="https://ibb.co/SDYB7XbW"

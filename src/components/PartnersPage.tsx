@@ -93,11 +93,11 @@ export const PartnersPage: React.FC<PartnersPageProps> = ({
             <button
               type="button"
               onClick={handleBack}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-bold transition-all active:scale-95 cursor-pointer border border-slate-200/80"
-              title="Navigate strictly one step back"
+              className="p-1 text-slate-700 hover:text-[#008080] transition-colors cursor-pointer shrink-0"
+              aria-label="Go back"
+              title="Go back"
             >
-              <ArrowLeft className="w-4 h-4 text-[#008080]" />
-              <span>Back</span>
+              <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
 
             <div className="h-6 w-px bg-slate-200 hidden xs:block" />

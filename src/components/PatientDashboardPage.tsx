@@ -1067,6 +1067,7 @@ export const PatientDashboardPage: React.FC<PatientDashboardPageProps> = ({
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {/* 1. WALLET ICON (Visible on all screens: small round icon with realistic wallet logo) */}
           <div className="relative shrink-0">
+            {/* 1. NHEALTH CARE WALLET BUTTON */}
             <button
               type="button"
               onClick={() => {
@@ -1075,13 +1076,9 @@ export const PatientDashboardPage: React.FC<PatientDashboardPageProps> = ({
               }}
               title={`Nhealth Care Wallet (₹${walletBalance})`}
               aria-label="Nhealth Care Wallet"
-              className={`relative p-2 rounded-full border transition-all cursor-pointer shrink-0 shadow-xs flex items-center justify-center ${
-                isDark
-                  ? 'bg-slate-800/80 hover:bg-slate-700 text-slate-200 border-cyan-800/40 hover:border-amber-400/50'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200 hover:border-amber-400/50'
-              }`}
+              className="relative p-1 text-slate-700 dark:text-slate-200 hover:text-[#008080] dark:hover:text-teal-400 transition-colors cursor-pointer shrink-0 flex items-center justify-center"
             >
-              <RealisticWalletLogo className="w-4 h-4 sm:w-4.5 sm:h-4.5 shrink-0" />
+              <RealisticWalletLogo className="w-5 h-5 sm:w-5.5 sm:h-5.5 shrink-0" />
               {walletBalance > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white dark:ring-[#00172d]" />
               )}
@@ -1180,13 +1177,9 @@ export const PatientDashboardPage: React.FC<PatientDashboardPageProps> = ({
               }}
               title="Notifications"
               aria-label="Notifications"
-              className={`relative p-2 rounded-full border text-xs font-bold transition-all cursor-pointer shrink-0 shadow-xs ${
-                isDark
-                  ? 'bg-slate-800/80 hover:bg-slate-700 text-slate-200 border-cyan-800/40'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
-              }`}
+              className="relative p-1 text-slate-700 dark:text-slate-200 hover:text-[#008080] dark:hover:text-teal-400 transition-colors cursor-pointer shrink-0 flex items-center justify-center"
             >
-              <Bell className="w-3.5 h-3.5" />
+              <Bell className="w-5 h-5" />
               {notifications.some((n) => !n.read) && (
                 <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center animate-pulse">
                   {notifications.filter((n) => !n.read).length}
@@ -1271,28 +1264,18 @@ export const PatientDashboardPage: React.FC<PatientDashboardPageProps> = ({
             )}
           </div>
 
-          {/* 3. LIGHT / DARK THEME TOGGLE SWITCH (Always visible across mobile, tablet, and desktop) */}
+          {/* 3. LIGHT / DARK THEME TOGGLE SWITCH (Clean standalone icon, no bounding box) */}
           <button
             type="button"
             onClick={toggleTheme}
             title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             aria-label="Toggle Light/Dark Theme"
-            className={`inline-flex items-center justify-center p-2 sm:px-2.5 sm:py-1.5 rounded-full border text-xs font-bold transition-all cursor-pointer shrink-0 shadow-xs ${
-              isDark
-                ? 'bg-cyan-950/70 hover:bg-cyan-900/80 text-amber-300 border-amber-400/40'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
-            }`}
+            className="p-1 text-slate-700 dark:text-amber-300 hover:text-[#008080] dark:hover:text-amber-200 transition-colors cursor-pointer shrink-0 flex items-center justify-center"
           >
             {isDark ? (
-              <>
-                <Sun className="w-3.5 h-3.5 text-amber-300" />
-                <span className="hidden xl:inline">Light</span>
-              </>
+              <Sun className="w-5 h-5 text-amber-300" />
             ) : (
-              <>
-                <Moon className="w-3.5 h-3.5 text-slate-700" />
-                <span className="hidden xl:inline">Dark</span>
-              </>
+              <Moon className="w-5 h-5 text-slate-700" />
             )}
           </button>
 

@@ -411,10 +411,11 @@ export const RoleBasedDashboard: React.FC<RoleBasedDashboardProps> = ({
                   onNavigateHome();
                 }
               }}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-300 hover:text-white px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+              className="p-1 text-slate-300 hover:text-white transition-colors cursor-pointer shrink-0"
+              aria-label="Go back"
+              title="Go back"
             >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Back</span>
+              <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
 
             <button

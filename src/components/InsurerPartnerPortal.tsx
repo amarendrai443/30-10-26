@@ -598,11 +598,11 @@ export const InsurerPartnerPortal: React.FC<InsurerPartnerPortalProps> = ({ onNa
                     onNavigateHome();
                   }
                 }}
-                className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all cursor-pointer border border-white/10 flex items-center gap-1.5"
-                title="Back strictly one step"
+                className="p-1 text-white hover:text-teal-300 transition-colors cursor-pointer shrink-0"
+                aria-label="Go back"
+                title="Go back"
               >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Back</span>
+                <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             )}
           </div>

@@ -208,17 +208,18 @@ export const DedicatedServiceDashboard: React.FC<DedicatedServiceDashboardProps>
   // Memoized sticky header to isolate state and prevent UI lags during intra-dashboard updates
   const stickyHeader = useMemo(() => (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+      <div className="max-w-7xl mx-auto px-2.5 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2 sm:gap-4 min-w-0">
+        <div className="flex items-center gap-1.5 sm:gap-3 min-w-0 flex-1">
           <button
             type="button"
             onClick={onBackToHome}
-            className="p-2 rounded-xl text-slate-600 hover:text-[#008080] hover:bg-teal-50 transition-colors cursor-pointer border border-slate-200"
-            title="Back strictly one step"
+            className="p-1 text-slate-700 hover:text-[#008080] transition-colors cursor-pointer shrink-0"
+            title="Go back"
+            aria-label="Go back"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
-          <div className="h-5 w-px bg-slate-200 hidden sm:block" />
+          <div className="h-5 w-px bg-slate-200 hidden sm:block shrink-0" />
           <a
             href="https://ibb.co/SDYB7XbW"
             target="_blank"
@@ -229,7 +230,7 @@ export const DedicatedServiceDashboard: React.FC<DedicatedServiceDashboardProps>
             <img
               src="https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
               alt="Nhealth Logo"
-              className="h-8 w-auto object-contain shrink-0"
+              className="h-6 sm:h-8 w-auto object-contain shrink-0"
               onError={(e) => {
                 const target = e.currentTarget;
                 if (target.src !== 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png') {
@@ -238,24 +239,25 @@ export const DedicatedServiceDashboard: React.FC<DedicatedServiceDashboardProps>
               }}
             />
           </a>
-          <div>
-            <div className="text-[10px] font-bold uppercase tracking-wider text-[#008080]">
+          <div className="min-w-0">
+            <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-[#008080] truncate hidden md:block">
               Nhealth Specialized Services
             </div>
-            <h1 className="text-base sm:text-lg font-black text-[#002b49] leading-tight truncate max-w-[220px] sm:max-w-md">
+            <h1 className="text-xs xs:text-sm sm:text-base md:text-lg font-black text-[#002b49] leading-tight truncate">
               {currentService.name}
             </h1>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={() => onOpenBookingModal(currentService, `Slot: ${selectedSlot}`)}
-            className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#008080] to-[#006666] hover:from-[#006666] hover:to-[#004d4d] text-white text-xs sm:text-sm font-bold shadow-sm transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+            className="px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-gradient-to-r from-[#008080] to-[#006666] hover:from-[#006666] hover:to-[#004d4d] text-white text-xs sm:text-sm font-bold shadow-sm transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 whitespace-nowrap shrink-0"
           >
-            <Calendar className="w-4 h-4" />
-            <span>Book Appointment</span>
+            <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span className="hidden xs:inline">Book Appointment</span>
+            <span className="xs:hidden">Book</span>
           </button>
         </div>
       </div>

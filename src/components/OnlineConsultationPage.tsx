@@ -365,10 +365,11 @@ export const OnlineConsultationPage: React.FC<OnlineConsultationPageProps> = ({
           <button
             type="button"
             onClick={onBackToHome}
-            className="inline-flex items-center justify-center p-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-[#008080] transition-all cursor-pointer shadow-2xs active:scale-95"
-            aria-label="Back"
+            className="p-1 text-slate-700 hover:text-[#008080] transition-colors cursor-pointer shrink-0"
+            aria-label="Go back"
+            title="Go back"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
           <div className="h-5 w-px bg-slate-200 hidden sm:block" />
           <a

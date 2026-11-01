@@ -562,10 +562,11 @@ export const SymptomDoctorFinder: React.FC<SymptomDoctorFinderProps> = ({
             <button
               type="button"
               onClick={handleBackToSearch}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-slate-300 hover:border-[#008080] text-slate-700 hover:text-[#008080] text-xs font-bold transition-all shadow-xs cursor-pointer group"
+              className="p-1 text-slate-700 hover:text-[#008080] transition-colors cursor-pointer shrink-0"
+              aria-label="Back to search"
+              title="Back to search"
             >
-              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-              <span>Back to Search &amp; All Services</span>
+              <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
 
             <div className="flex flex-wrap items-center gap-3">

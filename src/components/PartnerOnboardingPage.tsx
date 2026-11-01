@@ -326,11 +326,11 @@ export const PartnerOnboardingPage: React.FC<PartnerOnboardingPageProps> = ({
                   onNavigateHome();
                 }
               }}
-              aria-label="Back strictly one step"
-              title="Back"
-              className="inline-flex items-center justify-center w-10 h-10 rounded-xl text-slate-700 hover:text-[#008080] hover:bg-slate-100 active:bg-slate-200 transition-colors cursor-pointer shrink-0 border border-slate-200/60 sm:border-transparent"
+              aria-label="Go back"
+              title="Go back"
+              className="p-1 text-slate-700 hover:text-[#008080] transition-colors cursor-pointer shrink-0"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
           </div>
 
@@ -416,10 +416,11 @@ export const PartnerOnboardingPage: React.FC<PartnerOnboardingPageProps> = ({
               <button
                 type="button"
                 onClick={onNavigateHome}
-                className="w-full sm:w-auto px-6 py-3 rounded-xl bg-[#002b49] hover:bg-[#003d66] text-white font-bold text-xs sm:text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                className="p-2 text-slate-700 hover:text-[#008080] transition-colors cursor-pointer"
+                aria-label="Go back"
+                title="Go back"
               >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Return to Healthcare Portal</span>
+                <ArrowLeft className="w-6 h-6" />
               </button>
               <button
                 type="button"
