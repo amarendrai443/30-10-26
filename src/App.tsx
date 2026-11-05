@@ -94,6 +94,7 @@ import {
   MarqueeServiceItem,
   getStoredMarqueeServices,
   MARQUEE_SERVICES_UPDATED_EVENT,
+  SERVICE_HOVER_IMAGE_MAP,
 } from './utils/marqueeServicesStorage';
 import {
   PartnerApplication,
@@ -3171,14 +3172,21 @@ export default function App() {
                   (item.iconName && MARQUEE_ICON_MAP[item.iconName]) ||
                   (item as any).icon ||
                   Activity;
-                const isBedside =
-                  item.id === 'bedside' ||
-                  item.id === 'bedside-assistance' ||
-                  item.name.toLowerCase().includes('bedside');
-                const imageSrc = isBedside
-                  ? 'https://i.ibb.co/jZJ9f2Jq/bedside-assistance.png'
-                  : item.directUrl;
-                const localBackup = isBedside ? '/bedside-assistance.png' : item.localFile;
+                const idKey = (item.id || '').toLowerCase().trim();
+                const nameKey = (item.name || '').toLowerCase().trim();
+                // Strictly resolve hover preview to local /images/*-3x1.png only
+                const hoverImageSrc =
+                  SERVICE_HOVER_IMAGE_MAP[idKey] ||
+                  SERVICE_HOVER_IMAGE_MAP[nameKey] ||
+                  (item.hoverImage && item.hoverImage.startsWith('/images/') && item.hoverImage.endsWith('-3x1.png')
+                    ? item.hoverImage
+                    : '');
+                const rawUrl = item.directUrl || '';
+                const baseImageSrc =
+                  rawUrl.includes('ibb.co') || !rawUrl
+                    ? item.localFile || '/bedside-assistance.png'
+                    : rawUrl;
+                const localBackup = item.localFile || '/bedside-assistance.png';
                 return (
                   <div
                     key={`${item.id}-${idx}`}
@@ -3201,17 +3209,17 @@ export default function App() {
                   >
                     {/* Service Image Slot with Fallback Container (52% height of 3:2 card) */}
                     <div className="relative w-full h-[52%] rounded-xl overflow-hidden bg-slate-900/5 border border-slate-200/90 mb-1.5 flex items-center justify-center select-none pointer-events-none shrink-0">
+                      {/* Normal / Base State Image */}
                       <img
-                        src={imageSrc}
+                        src={baseImageSrc}
                         alt={item.name}
                         width={360}
                         height={187}
                         loading="lazy"
                         decoding="async"
                         draggable={false}
-                        className={`w-full h-full ${isBedside ? 'object-cover object-center' : 'object-cover'} transition-transform duration-500 group-hover/card:scale-105 select-none pointer-events-none`}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-105 select-none pointer-events-none"
                         style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }}
-                        referrerPolicy="no-referrer"
                         onError={(e) => {
                           const target = e.currentTarget;
                           target.onerror = null;
@@ -3223,6 +3231,26 @@ export default function App() {
                           }
                         }}
                       />
+
+                      {/* Strict Hover-Only -3x1.png Card Preview Background */}
+                      {hoverImageSrc && (
+                        <img
+                          src={hoverImageSrc}
+                          alt={`${item.name} hover preview`}
+                          width={360}
+                          height={187}
+                          loading="lazy"
+                          decoding="async"
+                          draggable={false}
+                          className="absolute inset-0 w-full h-full object-cover opacity-0 group-hover/card:opacity-100 transition-opacity duration-300 select-none pointer-events-none z-10"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }}
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            target.onerror = null;
+                            target.style.display = 'none';
+                          }}
+                        />
+                      )}
                       {/* Rich Stylized Visual Fallback Container */}
                       <div
                         className={`absolute inset-0 hidden flex-col items-center justify-center bg-gradient-to-br ${item.gradient || 'from-[#002b49] to-[#008080]'} p-3 text-center`}
