@@ -335,11 +335,13 @@ export const PartnerOnboardingPage: React.FC<PartnerOnboardingPageProps> = ({
           </div>
 
           <a
-            href="https://ibb.co/SDYB7XbW"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/"
+            onClick={(e) => {
+              e.preventDefault();
+              onNavigateHome();
+            }}
             className="flex items-center gap-2 cursor-pointer group min-w-0 hover:opacity-95"
-            title="Official Nhealth Logo"
+            title="Nhealth Home"
           >
             <img
               src="https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"

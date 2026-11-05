@@ -124,7 +124,7 @@ import {
 } from './utils/secureQrToken';
 import { generateMultiDayTokens } from './utils/multiDayTokenEngine';
 import { MobileHeroSplitCarousel } from './components/MobileHeroSplitCarousel';
-
+import { HEALTHCARE_FALLBACK_SVG, NHEALTH_LOGO_FALLBACK_SVG } from './utils/imageFallback';
 
 const NHEALTH_LOGO_URL = 'https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
 const NHEALTH_LOGO_FALLBACK = 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
@@ -344,16 +344,15 @@ export const getServiceDedicatedRoute = (identifier?: string | null): DedicatedS
   if (!identifier) return null;
   const clean = identifier.toLowerCase().trim().replace(/[-_]/g, ' ');
   if (clean.includes('doctor home visit') || clean.includes('doctor visit') || clean === 'doctor home visits') return 'doctor-home-visits';
-  if (clean.includes('diagnostic') && (clean.includes('advance') || clean.includes('imaging') || clean.includes('mri') || clean.includes('ct'))) return 'diagnostics-advance-imaging';
+  if (clean.includes('xray') || clean.includes('x ray') || clean.includes('portable diagnostic') || clean.includes('portable') || clean.includes('ecg')) return 'xray-portable-diagnostics';
+  if (clean.includes('advance imaging') || (clean.includes('diagnostic') && (clean.includes('advance') || clean.includes('imaging') || clean.includes('mri') || clean.includes('ct')))) return 'diagnostics-advance-imaging';
   if (clean.includes('diagnostic') || clean.includes('lab') || clean.includes('blood test') || clean.includes('pathology')) return 'home-diagnostics';
-  if (clean.includes('xray') || clean.includes('x ray') || clean.includes('portable diagnostic') || clean.includes('ecg')) return 'xray-portable-diagnostics';
   if (clean.includes('bedside') || clean.includes('attendant') || clean.includes('caregiver')) return 'bedside-assistance';
   if (clean.includes('elder') || clean.includes('senior') || clean.includes('geriatric')) return 'eldercare-senior-assistance';
   if (clean.includes('nursing') || clean.includes('wound') || clean.includes('injection') || clean.includes('iv infusion')) return 'specialized-nursing-care';
   if (clean.includes('physio') || clean.includes('rehab') || clean.includes('physical therapy')) return 'physiotherapy-at-home';
   if (clean.includes('dental') || clean.includes('oral') || clean.includes('teeth') || clean.includes('dentist')) return 'dental-care-oral-health';
   if (clean.includes('opd') || clean.includes('premium opd') || clean.includes('hospital assistance')) return 'prepaid-premium-opd';
-  if (clean.includes('advance imaging') || clean.includes('imaging') || clean.includes('mri') || clean.includes('ct scan')) return 'diagnostics-advance-imaging';
   if (clean.includes('blood bank') || clean.includes('blood donor') || clean.includes('blood support') || clean.includes('blood')) return 'blood-bank-support';
   if (clean.includes('ambulance') || clean.includes('sos') || clean.includes('emergency ambulance')) return 'ambulance-24-7';
   if (clean.includes('careride') || clean.includes('care ride') || clean.includes('medical transit') || clean.includes('patient transport') || clean.includes('transit')) return 'nhealth-careride';
@@ -2225,17 +2224,14 @@ export default function App() {
         <div className="w-full lg:max-w-none px-2.5 sm:px-5 lg:px-6 xl:px-8 2xl:px-12 h-20 flex items-center justify-between min-w-0">
           {/* Zone 1: Brand Wordmark & Official Logo */}
           <a
-            href="https://ibb.co/SDYB7XbW"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/"
             onClick={(e) => {
-              if (currentRoute !== 'home') {
-                e.preventDefault();
-                navigateTo('home', '/');
-              }
+              e.preventDefault();
+              navigateTo('home', '/');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            className="flex items-center gap-1.5 sm:gap-2 group transition-opacity hover:opacity-90 whitespace-nowrap shrink-0 pr-1 sm:pr-2 xl:pr-4"
-            title="Official Nhealth Logo"
+            className="flex items-center gap-1.5 sm:gap-2 group transition-opacity hover:opacity-90 whitespace-nowrap shrink-0 pr-1 sm:pr-2 xl:pr-4 cursor-pointer"
+            title="Nhealth Home"
           >
             <img
               src={NHEALTH_LOGO_URL}
@@ -2243,8 +2239,11 @@ export default function App() {
               className="h-7 sm:h-9 lg:h-11 w-auto object-contain shrink-0"
               onError={(e) => {
                 const target = e.currentTarget;
+                target.onerror = null;
                 if (target.src !== NHEALTH_LOGO_FALLBACK) {
                   target.src = NHEALTH_LOGO_FALLBACK;
+                } else {
+                  target.src = NHEALTH_LOGO_FALLBACK_SVG;
                 }
               }}
             />
@@ -2314,12 +2313,7 @@ export default function App() {
                           type="button"
                           onClick={() => {
                             setServicesDropdownHover(false);
-                            if (currentRoute !== 'home') {
-                              navigateTo('home', '/');
-                              setTimeout(() => openBookingFor(item.name), 150);
-                            } else {
-                              openBookingFor(item.name);
-                            }
+                            openBookingFor(item.name);
                           }}
                           className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left text-xs font-medium text-slate-700 hover:text-[#008080] hover:bg-[#e6f4f4]/60 transition-colors cursor-pointer group/item"
                         >
@@ -3177,6 +3171,14 @@ export default function App() {
                   (item.iconName && MARQUEE_ICON_MAP[item.iconName]) ||
                   (item as any).icon ||
                   Activity;
+                const isBedside =
+                  item.id === 'bedside' ||
+                  item.id === 'bedside-assistance' ||
+                  item.name.toLowerCase().includes('bedside');
+                const imageSrc = isBedside
+                  ? 'https://i.ibb.co/jZJ9f2Jq/bedside-assistance.png'
+                  : item.directUrl;
+                const localBackup = isBedside ? '/bedside-assistance.png' : item.localFile;
                 return (
                   <div
                     key={`${item.id}-${idx}`}
@@ -3200,25 +3202,24 @@ export default function App() {
                     {/* Service Image Slot with Fallback Container (52% height of 3:2 card) */}
                     <div className="relative w-full h-[52%] rounded-xl overflow-hidden bg-slate-900/5 border border-slate-200/90 mb-1.5 flex items-center justify-center select-none pointer-events-none shrink-0">
                       <img
-                        src={item.directUrl}
+                        src={imageSrc}
                         alt={item.name}
+                        width={360}
+                        height={187}
                         loading="lazy"
                         decoding="async"
                         draggable={false}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-105 select-none pointer-events-none"
+                        className={`w-full h-full ${isBedside ? 'object-cover object-center' : 'object-cover'} transition-transform duration-500 group-hover/card:scale-105 select-none pointer-events-none`}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }}
                         referrerPolicy="no-referrer"
                         onError={(e) => {
                           const target = e.currentTarget;
-                          if (!target.dataset.triedLocal && item.localFile) {
+                          target.onerror = null;
+                          if (!target.dataset.triedLocal && localBackup) {
                             target.dataset.triedLocal = 'true';
-                            target.src = item.localFile;
+                            target.src = localBackup;
                           } else {
-                            target.style.display = 'none';
-                            const fallbackEl = target.nextElementSibling as HTMLElement;
-                            if (fallbackEl) {
-                              fallbackEl.classList.remove('hidden');
-                              fallbackEl.classList.add('flex');
-                            }
+                            target.src = HEALTHCARE_FALLBACK_SVG;
                           }
                         }}
                       />
@@ -3531,8 +3532,12 @@ export default function App() {
                     referrerPolicy="no-referrer"
                     loading="eager"
                     onError={(e) => {
-                      if (logo.fallback && e.currentTarget.src !== window.location.origin + logo.fallback) {
-                        e.currentTarget.src = logo.fallback;
+                      const target = e.currentTarget;
+                      target.onerror = null;
+                      if (logo.fallback && target.src !== window.location.origin + logo.fallback) {
+                        target.src = logo.fallback;
+                      } else {
+                        target.src = HEALTHCARE_FALLBACK_SVG;
                       }
                     }}
                   />

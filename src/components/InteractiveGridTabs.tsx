@@ -1,6 +1,7 @@
 import React from 'react';
 import { ExternalLink, Sparkles } from 'lucide-react';
 import { GridTabItem, GridTabSectionType } from '../utils/gridTabsStorage';
+import { HEALTHCARE_FALLBACK_SVG } from '../utils/imageFallback';
 
 interface InteractiveGridTabsProps {
   sectionKey: GridTabSectionType;
@@ -71,8 +72,9 @@ export const InteractiveGridTabs: React.FC<InteractiveGridTabsProps> = ({
                 loading="lazy"
                 className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
                 onError={(e) => {
-                  e.currentTarget.src =
-                    'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=400&q=80';
+                  const target = e.currentTarget;
+                  target.onerror = null;
+                  target.src = HEALTHCARE_FALLBACK_SVG;
                 }}
               />
             ) : (

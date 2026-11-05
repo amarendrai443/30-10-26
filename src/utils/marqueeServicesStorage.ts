@@ -17,9 +17,9 @@ export const DEFAULT_MARQUEE_SERVICES: MarqueeServiceItem[] = [
   {
     id: 'physiotherapy',
     name: 'Physiotherapy',
-    directUrl: 'https://i.ibb.co/MD4rcRxf/physiotherapy.png',
+    directUrl: 'https://i.ibb.co/5Xtqm8Gt/physiotherapy.png',
     localFile: '/physiotherapy.png',
-    pageUrl: 'https://ibb.co/Z6P5BhpS',
+    pageUrl: '/services?id=physiotherapy-at-home',
     tagline: 'Home Rehabilitation & Mobility Care',
     category: 'Therapy',
     iconName: 'Activity',
@@ -29,9 +29,9 @@ export const DEFAULT_MARQUEE_SERVICES: MarqueeServiceItem[] = [
   {
     id: 'care-ride',
     name: 'Nhealth Care Ride',
-    directUrl: 'https://i.ibb.co/HLBmNpxW/nhealth-care-ride.png',
+    directUrl: 'https://i.ibb.co/3Yp4Nzcg/nhealth-care-ride.png',
     localFile: '/nhealth%20care%20ride.png',
-    pageUrl: 'https://ibb.co/TDYzKqbV',
+    pageUrl: '/services?id=nhealth-care-ride',
     tagline: 'Assisted Non-Emergency Medical Transit',
     category: 'Transit',
     iconName: 'Car',
@@ -41,9 +41,9 @@ export const DEFAULT_MARQUEE_SERVICES: MarqueeServiceItem[] = [
   {
     id: 'teleconsult',
     name: 'Online Doctor Consultations',
-    directUrl: 'https://i.ibb.co/xKYqBdCf/online-doctor-consultations.png',
+    directUrl: 'https://i.ibb.co/FkYFbF5z/online-doctor-consultations.png',
     localFile: '/online%20doctor%20consultations.png',
-    pageUrl: 'https://ibb.co/8nbgftKd',
+    pageUrl: '/online-consultation',
     tagline: 'Instant Specialist Video & E-Prescription',
     category: 'Tele-Health',
     iconName: 'Video',
@@ -53,9 +53,9 @@ export const DEFAULT_MARQUEE_SERVICES: MarqueeServiceItem[] = [
   {
     id: 'care-assist',
     name: 'Care Assist',
-    directUrl: 'https://i.ibb.co/k2fngTSD/nhealth-care-assist.png',
+    directUrl: 'https://i.ibb.co/pB2BJ6HL/nhealth-care-assist.png',
     localFile: '/nhealth%20care%20assist.png',
-    pageUrl: 'https://ibb.co/RTmnpKD6',
+    pageUrl: '/services?id=nhealth-careassist',
     tagline: 'Trained Home Attendants & Daily Support',
     category: 'Personal Care',
     iconName: 'HeartHandshake',
@@ -65,9 +65,9 @@ export const DEFAULT_MARQUEE_SERVICES: MarqueeServiceItem[] = [
   {
     id: 'home-xray',
     name: 'Home X-Ray Services',
-    directUrl: 'https://i.ibb.co/wNP3sZ5j/home-X-ray-Services.png',
+    directUrl: 'https://i.ibb.co/FbqnTB6P/home-X-ray-Services.png',
     localFile: '/home%20X-ray%20Services.png',
-    pageUrl: 'https://ibb.co/mC218rfg',
+    pageUrl: '/services?id=xray-portable-diagnostics',
     tagline: 'Portable Digital Radiography At Doorstep',
     category: 'Imaging',
     iconName: 'Layers',
@@ -77,9 +77,9 @@ export const DEFAULT_MARQUEE_SERVICES: MarqueeServiceItem[] = [
   {
     id: 'bedside',
     name: 'Bedside Assistance',
-    directUrl: 'https://i.ibb.co/jZWnsBZY/bedside-assistance.png',
+    directUrl: 'https://i.ibb.co/jZJ9f2Jq/bedside-assistance.png',
     localFile: '/bedside%20assistance.png',
-    pageUrl: 'https://ibb.co/Z1Yq7t1r',
+    pageUrl: '/services?id=bedside-assistance',
     tagline: 'Compassionate Post-Hospitalization Care',
     category: 'Nursing',
     iconName: 'HeartPulse',
@@ -89,9 +89,9 @@ export const DEFAULT_MARQUEE_SERVICES: MarqueeServiceItem[] = [
   {
     id: 'premium-opd',
     name: 'Premium OPD Services',
-    directUrl: 'https://i.ibb.co/xWCH1bq/premium-opd-services.png',
+    directUrl: 'https://i.ibb.co/MkH7GfxQ/premium-opd-services.png',
     localFile: '/premium%20opd%20services.png',
-    pageUrl: 'https://ibb.co/H6FdtyT',
+    pageUrl: '/services?id=priority-opd-specialist-checkin',
     tagline: 'Priority Zero-Wait Specialist Clinic Access',
     category: 'Priority Care',
     iconName: 'Award',
@@ -103,7 +103,7 @@ export const DEFAULT_MARQUEE_SERVICES: MarqueeServiceItem[] = [
     name: 'Pharmacy Delivery',
     directUrl: 'https://i.ibb.co/7NgLgBCz/Pharmacy-to-home.png',
     localFile: '/Pharmacy%20to%20home.png',
-    pageUrl: 'https://ibb.co/wrJjJ8gL',
+    pageUrl: '/doorstep-pharmacy',
     tagline: 'Direct Temperature-Controlled Medicines',
     category: 'Pharmacy',
     iconName: 'Pill',
@@ -113,9 +113,9 @@ export const DEFAULT_MARQUEE_SERVICES: MarqueeServiceItem[] = [
   {
     id: 'prebook-opd',
     name: 'Pre-Booking OPD',
-    directUrl: 'https://i.ibb.co/BVmgv704/pre-booking-opd-services.png',
+    directUrl: 'https://i.ibb.co/21LnqVFL/pre-booking-opd-services.png',
     localFile: '/pre%20booking%20opd%20services.png',
-    pageUrl: 'https://ibb.co/1f39BpFs',
+    pageUrl: '/services?id=priority-opd-specialist-checkin',
     tagline: 'Guaranteed Consult Slots & Express Tokens',
     category: 'Scheduling',
     iconName: 'CalendarCheck',
@@ -126,6 +126,49 @@ export const DEFAULT_MARQUEE_SERVICES: MarqueeServiceItem[] = [
 
 const STORAGE_KEY = 'nhealth_marquee_services';
 export const MARQUEE_SERVICES_UPDATED_EVENT = 'nhealth_marquee_services_updated';
+
+const INTERNAL_SERVICE_ROUTING_MAP: Record<string, string> = {
+  'physiotherapy': '/services?id=physiotherapy-at-home',
+  'care-ride': '/services?id=nhealth-care-ride',
+  'nhealth care ride': '/services?id=nhealth-care-ride',
+  'teleconsult': '/online-consultation',
+  'online doctor consultations': '/online-consultation',
+  'care-assist': '/services?id=nhealth-careassist',
+  'care assist': '/services?id=nhealth-careassist',
+  'home-xray': '/services?id=xray-portable-diagnostics',
+  'home x-ray services': '/services?id=xray-portable-diagnostics',
+  'bedside': '/services?id=bedside-assistance',
+  'bedside assistance': '/services?id=bedside-assistance',
+  'bedside-assistance': '/services?id=bedside-assistance',
+  'premium-opd': '/services?id=priority-opd-specialist-checkin',
+  'premium opd services': '/services?id=priority-opd-specialist-checkin',
+  'pharmacy': '/doorstep-pharmacy',
+  'pharmacy delivery': '/doorstep-pharmacy',
+  'prebook-opd': '/services?id=priority-opd-specialist-checkin',
+  'pre-booking opd': '/services?id=priority-opd-specialist-checkin',
+};
+
+const VERIFIED_CDN_URL_MAP: Record<string, string> = {
+  'pre-booking opd': 'https://i.ibb.co/21LnqVFL/pre-booking-opd-services.png',
+  'prebook-opd': 'https://i.ibb.co/21LnqVFL/pre-booking-opd-services.png',
+  'pre booking opd': 'https://i.ibb.co/21LnqVFL/pre-booking-opd-services.png',
+  'physiotherapy': 'https://i.ibb.co/5Xtqm8Gt/physiotherapy.png',
+  'nhealth care ride': 'https://i.ibb.co/3Yp4Nzcg/nhealth-care-ride.png',
+  'care-ride': 'https://i.ibb.co/3Yp4Nzcg/nhealth-care-ride.png',
+  'online doctor consultations': 'https://i.ibb.co/FkYFbF5z/online-doctor-consultations.png',
+  'teleconsult': 'https://i.ibb.co/FkYFbF5z/online-doctor-consultations.png',
+  'care assist': 'https://i.ibb.co/pB2BJ6HL/nhealth-care-assist.png',
+  'care-assist': 'https://i.ibb.co/pB2BJ6HL/nhealth-care-assist.png',
+  'home x-ray services': 'https://i.ibb.co/FbqnTB6P/home-X-ray-Services.png',
+  'home-xray': 'https://i.ibb.co/FbqnTB6P/home-X-ray-Services.png',
+  'bedside assistance': 'https://i.ibb.co/jZJ9f2Jq/bedside-assistance.png',
+  'bedside': 'https://i.ibb.co/jZJ9f2Jq/bedside-assistance.png',
+  'bedside-assistance': 'https://i.ibb.co/jZJ9f2Jq/bedside-assistance.png',
+  'premium opd services': 'https://i.ibb.co/MkH7GfxQ/premium-opd-services.png',
+  'premium-opd': 'https://i.ibb.co/MkH7GfxQ/premium-opd-services.png',
+  'pharmacy delivery': 'https://i.ibb.co/7NgLgBCz/Pharmacy-to-home.png',
+  'pharmacy': 'https://i.ibb.co/7NgLgBCz/Pharmacy-to-home.png',
+};
 
 export const getStoredMarqueeServices = (): MarqueeServiceItem[] => {
   if (typeof window === 'undefined') return DEFAULT_MARQUEE_SERVICES;
@@ -139,18 +182,26 @@ export const getStoredMarqueeServices = (): MarqueeServiceItem[] => {
     if (Array.isArray(parsed) && parsed.length > 0) {
       let needsUpdate = false;
       parsed = parsed.map((item: MarqueeServiceItem) => {
-        if (item.id === 'pharmacy' || item.name === 'Pharmacy Delivery') {
-          if (item.pageUrl !== 'https://ibb.co/wrJjJ8gL' || !item.directUrl.includes('7NgLgBCz')) {
+        const idKey = (item.id || '').toLowerCase();
+        const nameKey = (item.name || '').toLowerCase();
+        const verifiedUrl = VERIFIED_CDN_URL_MAP[idKey] || VERIFIED_CDN_URL_MAP[nameKey];
+        const internalRoute = INTERNAL_SERVICE_ROUTING_MAP[idKey] || INTERNAL_SERVICE_ROUTING_MAP[nameKey];
+        let updatedItem = { ...item };
+
+        if (verifiedUrl && updatedItem.directUrl !== verifiedUrl) {
+          needsUpdate = true;
+          updatedItem.directUrl = verifiedUrl;
+        }
+
+        // Sanitize any legacy external pageUrls to strictly internal Nhealth routes
+        if (!updatedItem.pageUrl || updatedItem.pageUrl.includes('ibb.co') || updatedItem.pageUrl.startsWith('http')) {
+          if (internalRoute) {
             needsUpdate = true;
-            return {
-              ...item,
-              pageUrl: 'https://ibb.co/wrJjJ8gL',
-              directUrl: 'https://i.ibb.co/7NgLgBCz/Pharmacy-to-home.png',
-              localFile: '/Pharmacy%20to%20home.png',
-            };
+            updatedItem.pageUrl = internalRoute;
           }
         }
-        return item;
+
+        return updatedItem;
       });
       if (needsUpdate) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));

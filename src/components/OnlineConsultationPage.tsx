@@ -29,6 +29,7 @@ import {
   X,
   ExternalLink,
 } from 'lucide-react';
+import { NHEALTH_LOGO_FALLBACK_SVG } from '../utils/imageFallback';
 import { EMPANELED_DOCTORS } from '../data/doctorsData';
 import { EmpaneledDoctor } from '../types/doctorFinder';
 import { ServiceItem, BookingFormData } from '../types/serviceBooking';
@@ -360,8 +361,8 @@ export const OnlineConsultationPage: React.FC<OnlineConsultationPageProps> = ({
   // Memoized sticky navigation header to isolate component state and avoid UI lags
   const stickyHeader = useMemo(() => (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs">
-      <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+      <div className="max-w-7xl mx-auto px-2.5 sm:px-6 lg:px-8 py-2.5 sm:py-3 flex items-center justify-between gap-2 sm:gap-3 min-w-0">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1">
           <button
             type="button"
             onClick={onBackToHome}
@@ -371,35 +372,40 @@ export const OnlineConsultationPage: React.FC<OnlineConsultationPageProps> = ({
           >
             <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
-          <div className="h-5 w-px bg-slate-200 hidden sm:block" />
+          <div className="h-5 w-px bg-slate-200 hidden sm:block shrink-0" />
           <a
-            href="https://ibb.co/SDYB7XbW"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center shrink-0 hover:opacity-90 transition-opacity"
-            title="Official Nhealth Logo"
+            href="/"
+            onClick={(e) => {
+              e.preventDefault();
+              onBackToHome();
+            }}
+            className="flex items-center shrink-0 hover:opacity-90 transition-opacity cursor-pointer"
+            title="Nhealth Home"
           >
             <img
               src="https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
               alt="Nhealth Logo"
-              className="h-8 w-auto object-contain shrink-0"
+              className="h-6 sm:h-7 md:h-8 w-auto object-contain shrink-0"
               onError={(e) => {
                 const target = e.currentTarget;
+                target.onerror = null;
                 if (target.src !== 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png') {
                   target.src = 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
+                } else {
+                  target.src = NHEALTH_LOGO_FALLBACK_SVG;
                 }
               }}
             />
           </a>
-          <div>
-            <h1 className="text-sm sm:text-base md:text-lg font-black text-[#002b49] leading-tight flex items-center gap-2">
-              <span>Online Doctor Consultation</span>
-              <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xs sm:text-sm md:text-base font-bold text-[#002b49] leading-tight truncate flex items-center gap-1.5">
+              <span className="truncate">Online Doctor Consultation</span>
+              <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
                 <span>100+ Specialists Live</span>
               </span>
             </h1>
-            <p className="text-[11px] text-slate-500 hidden sm:block">
+            <p className="text-[11px] text-slate-500 hidden sm:block truncate">
               Instant Video Connect · Digital Rx in Minutes · 100% Empaneled MD Doctors
             </p>
           </div>

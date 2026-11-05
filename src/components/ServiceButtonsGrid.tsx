@@ -1,6 +1,7 @@
 import React from 'react';
 import { ServiceItem } from '../types/serviceBooking';
 import { EXTRACTED_SERVICES } from '../data/servicesData';
+import { HEALTHCARE_FALLBACK_SVG } from '../utils/imageFallback';
 
 interface ServiceButtonsGridProps {
   onSelectService: (service: ServiceItem) => void;
@@ -32,8 +33,11 @@ export const ServiceButtonsGrid: React.FC<ServiceButtonsGridProps> = ({ onSelect
                 className="w-full h-full object-cover object-center transform group-hover:scale-[1.03] transition-transform duration-300 will-change-transform"
                 onError={(e) => {
                   const target = e.currentTarget;
-                  if (target.src !== window.location.origin + service.iconImage) {
+                  target.onerror = null;
+                  if (service.iconImage && target.src !== window.location.origin + service.iconImage) {
                     target.src = service.iconImage;
+                  } else {
+                    target.src = HEALTHCARE_FALLBACK_SVG;
                   }
                 }}
               />

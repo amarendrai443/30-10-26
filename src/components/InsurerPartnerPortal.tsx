@@ -538,11 +538,13 @@ export const InsurerPartnerPortal: React.FC<InsurerPartnerPortalProps> = ({ onNa
           <div className="flex items-center gap-3.5">
             {/* Exact Nhealth Logo from link: https://ibb.co/SDYB7XbW with reliable direct asset fallback */}
             <a
-              href="https://ibb.co/SDYB7XbW"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white p-1 flex items-center justify-center shrink-0 shadow-sm border border-white/20 hover:opacity-90"
-              title="Official Nhealth Logo"
+              href="/"
+              onClick={(e) => {
+                e.preventDefault();
+                onNavigateHome();
+              }}
+              className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white p-1 flex items-center justify-center shrink-0 shadow-sm border border-white/20 hover:opacity-90 cursor-pointer"
+              title="Nhealth Home"
             >
               <img
                 src="https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"

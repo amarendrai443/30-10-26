@@ -41,6 +41,7 @@ import {
   Coins,
   Menu,
 } from 'lucide-react';
+import { HEALTHCARE_FALLBACK_SVG, NHEALTH_LOGO_FALLBACK_SVG } from '../utils/imageFallback';
 import {
   PHARMACY_CATEGORIES,
   TRENDING_MEDICINES,
@@ -597,7 +598,7 @@ export const DoorstepPharmacyPage: React.FC<DoorstepPharmacyPageProps> = ({
     <header className="sticky top-0 z-50 bg-white text-slate-800 shadow-xs border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-2.5 sm:px-6 lg:px-8 py-2.5 sm:py-3 flex items-center justify-between gap-2 sm:gap-3 min-w-0">
           {/* Left: Strict 1-step Back Button, Official Nhealth Logo & Title "Doorstep Pharmacy" */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1">
             <button
               type="button"
               onClick={onBackToHome}
@@ -609,25 +610,30 @@ export const DoorstepPharmacyPage: React.FC<DoorstepPharmacyPageProps> = ({
             </button>
             <div className="h-5 w-px bg-slate-200 hidden sm:block shrink-0" />
             <a
-              href="https://ibb.co/SDYB7XbW"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center shrink-0 hover:opacity-90 transition-opacity"
-              title="Official Nhealth Logo"
+              href="/"
+              onClick={(e) => {
+                e.preventDefault();
+                onBackToHome();
+              }}
+              className="flex items-center shrink-0 hover:opacity-90 transition-opacity cursor-pointer"
+              title="Nhealth Home"
             >
               <img
                 src="https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
                 alt="Nhealth Official Logo"
-                className="h-6 sm:h-8 md:h-9 w-auto object-contain shrink-0"
+                className="h-6 sm:h-7 md:h-8 w-auto object-contain shrink-0"
                 onError={(e) => {
                   const target = e.currentTarget;
+                  target.onerror = null;
                   if (target.src !== 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png') {
                     target.src = 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
+                  } else {
+                    target.src = NHEALTH_LOGO_FALLBACK_SVG;
                   }
                 }}
               />
             </a>
-            <h1 className="text-xs xs:text-sm sm:text-base md:text-lg font-bold tracking-tight text-[#002b49] whitespace-nowrap truncate min-w-0">
+            <h1 className="text-xs sm:text-sm md:text-base font-bold tracking-tight text-[#002b49] whitespace-nowrap truncate min-w-0">
               Doorstep Pharmacy
             </h1>
           </div>
@@ -977,6 +983,11 @@ export const DoorstepPharmacyPage: React.FC<DoorstepPharmacyPageProps> = ({
                           alt={prod.name}
                           loading="lazy"
                           className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            target.onerror = null;
+                            target.src = HEALTHCARE_FALLBACK_SVG;
+                          }}
                         />
                         <div className="absolute top-2.5 left-2.5 flex flex-col gap-1">
                           {prod.requiresPrescription ? (

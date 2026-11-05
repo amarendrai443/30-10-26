@@ -33,6 +33,7 @@ import {
   resetMarqueeServices,
   MARQUEE_SERVICES_UPDATED_EVENT,
 } from '../utils/marqueeServicesStorage';
+import { HEALTHCARE_FALLBACK_SVG } from '../utils/imageFallback';
 
 const ICON_MAP: Record<string, React.ElementType> = {
   Activity,
@@ -241,7 +242,10 @@ export const AdminMarqueeServicesManager: React.FC = () => {
                         alt={item.name}
                         className="w-full h-full object-cover"
                         onError={(e) => {
-                          if (item.localFile) e.currentTarget.src = item.localFile;
+                          const target = e.currentTarget;
+                          target.onerror = null;
+                          if (item.localFile) target.src = item.localFile;
+                          else target.src = HEALTHCARE_FALLBACK_SVG;
                         }}
                       />
                       <span className="absolute top-1 left-1 bg-[#002b49]/90 text-white text-[8px] font-bold px-1.5 py-0.5 rounded">
@@ -300,7 +304,10 @@ export const AdminMarqueeServicesManager: React.FC = () => {
                       alt={item.name}
                       className="w-full h-full object-cover"
                       onError={(e) => {
-                        if (item.localFile) e.currentTarget.src = item.localFile;
+                        const target = e.currentTarget;
+                        target.onerror = null;
+                        if (item.localFile) target.src = item.localFile;
+                        else target.src = HEALTHCARE_FALLBACK_SVG;
                       }}
                     />
                     <div className="absolute top-1 left-1 bg-black/70 text-white text-[8px] font-bold px-1 rounded">

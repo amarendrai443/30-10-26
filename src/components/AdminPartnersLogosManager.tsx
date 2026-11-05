@@ -26,6 +26,7 @@ import {
   resetPartnerLogos,
   normalizeLogoUrl,
 } from '../utils/partnerLogosStorage';
+import { NHEALTH_LOGO_FALLBACK_SVG } from '../utils/imageFallback';
 
 export const AdminPartnersLogosManager: React.FC = () => {
   const [partnerLogos, setPartnerLogos] = useState<PartnerLogoItem[]>(getStoredPartnerLogos);
@@ -263,7 +264,10 @@ export const AdminPartnersLogosManager: React.FC = () => {
                     alt={logo.name}
                     className="h-10 sm:h-12 w-auto object-contain max-w-[140px]"
                     onError={(e) => {
-                      if (logo.fallback) e.currentTarget.src = logo.fallback;
+                      const target = e.currentTarget;
+                      target.onerror = null;
+                      if (logo.fallback) target.src = logo.fallback;
+                      else target.src = NHEALTH_LOGO_FALLBACK_SVG;
                     }}
                   />
                 </div>
@@ -343,7 +347,10 @@ export const AdminPartnersLogosManager: React.FC = () => {
                           referrerPolicy="no-referrer"
                           loading="eager"
                           onError={(e) => {
-                            if (logo.fallback) e.currentTarget.src = logo.fallback;
+                            const target = e.currentTarget;
+                            target.onerror = null;
+                            if (logo.fallback) target.src = logo.fallback;
+                            else target.src = NHEALTH_LOGO_FALLBACK_SVG;
                           }}
                         />
                       </div>

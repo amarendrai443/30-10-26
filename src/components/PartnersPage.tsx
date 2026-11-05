@@ -103,11 +103,13 @@ export const PartnersPage: React.FC<PartnersPageProps> = ({
             <div className="h-6 w-px bg-slate-200 hidden xs:block" />
 
             <a
-              href="https://ibb.co/SDYB7XbW"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 hover:opacity-95"
-              title="Official Nhealth Logo"
+              href="/"
+              onClick={(e) => {
+                e.preventDefault();
+                onBackToHome();
+              }}
+              className="flex items-center gap-2 hover:opacity-95 cursor-pointer"
+              title="Nhealth Home"
             >
               <img
                 src="https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"

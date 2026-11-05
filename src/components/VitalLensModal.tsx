@@ -94,6 +94,13 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
   const [liveBpm, setLiveBpm] = useState<number>(72);
   const [isFaceDetected, setIsFaceDetected] = useState(true);
 
+  // MediaPipe Face Mesh Detection Refs
+  const faceMeshRef = useRef<any>(null);
+  const isFaceMeshReadyRef = useRef<boolean>(false);
+  const faceMeshProcessingRef = useRef<boolean>(false);
+  const latestFaceLandmarksRef = useRef<any[] | null>(null);
+  const isFaceDetectedRef = useRef<boolean>(true);
+
   // Step 5: Final Results & PDF Report State
   const [scanResults, setScanResults] = useState<VitalMetricsResult | null>(null);
   const [activeResultsTab, setActiveResultsTab] = useState<'key_vitals' | 'heart_health' | 'mental_wellbeing' | 'physiological'>('key_vitals');
@@ -114,6 +121,72 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
 
   // Wave points for live vPPG display
   const wavePointsRef = useRef<number[]>([]);
+
+  // Asynchronous MediaPipe Face Mesh loader & initializer
+  const loadMediaPipeScript = (): Promise<void> => {
+    return new Promise((resolve) => {
+      if (typeof window === 'undefined') return resolve();
+      if ((window as any).FaceMesh) return resolve();
+      const existing = document.getElementById('mediapipe-facemesh-script');
+      if (existing) {
+        existing.addEventListener('load', () => resolve(), { once: true });
+        existing.addEventListener('error', () => resolve(), { once: true });
+        return;
+      }
+      const script = document.createElement('script');
+      script.id = 'mediapipe-facemesh-script';
+      script.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js';
+      script.crossOrigin = 'anonymous';
+      script.onload = () => resolve();
+      script.onerror = () => resolve();
+      document.head.appendChild(script);
+    });
+  };
+
+  const initFaceMesh = async () => {
+    try {
+      await loadMediaPipeScript();
+      if ((window as any).FaceMesh && !faceMeshRef.current) {
+        const fm = new (window as any).FaceMesh({
+          locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
+        });
+        fm.setOptions({
+          maxNumFaces: 1,
+          refineLandmarks: true,
+          minDetectionConfidence: 0.5,
+          minTrackingConfidence: 0.5,
+        });
+        fm.onResults((results: any) => {
+          // Strict MediaPipe results.multiFaceLandmarks validation on every frame
+          const hasFace = !!(
+            results &&
+            results.multiFaceLandmarks &&
+            results.multiFaceLandmarks.length > 0 &&
+            results.multiFaceLandmarks[0].length >= 30
+          );
+
+          if (hasFace) {
+            latestFaceLandmarksRef.current = results.multiFaceLandmarks[0];
+            if (!isFaceDetectedRef.current) {
+              isFaceDetectedRef.current = true;
+              setIsFaceDetected(true);
+            }
+          } else {
+            latestFaceLandmarksRef.current = null;
+            if (isFaceDetectedRef.current) {
+              isFaceDetectedRef.current = false;
+              setIsFaceDetected(false);
+            }
+          }
+        });
+        await fm.initialize?.();
+        faceMeshRef.current = fm;
+        isFaceMeshReadyRef.current = true;
+      }
+    } catch (err) {
+      console.warn('MediaPipe Face Mesh initialization note:', err);
+    }
+  };
 
   // 1. Web Wake Lock API Helper: request screen wake lock
   const requestScreenWakeLock = async () => {
@@ -353,6 +426,9 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
         videoRef.current.play().catch(() => {});
       }
 
+      // Initialize MediaPipe Face Mesh detector
+      initFaceMesh();
+
       // Initialize vPPG processor
       processorRef.current.reset();
       wavePointsRef.current = [];
@@ -414,42 +490,57 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
+    if (faceMeshRef.current) {
+      try {
+        faceMeshRef.current.close();
+      } catch {}
+      faceMeshRef.current = null;
+      isFaceMeshReadyRef.current = false;
+    }
+    isFaceDetectedRef.current = true;
+    latestFaceLandmarksRef.current = null;
+    setIsFaceDetected(true);
   };
 
   // Step 4 Scanning and vPPG Extraction Loop
   const startScanningProcess = (isSimulated = false) => {
-    // 1. Timer countdown for SCAN_DURATION_SECONDS (70s)
-    let elapsed = 0;
     if (scanTimerRef.current) clearInterval(scanTimerRef.current);
 
     scanTimerRef.current = window.setInterval(() => {
-      elapsed += 1;
-      setScanSecondsElapsed(elapsed);
-
-      // Status messages updating in real time
-      if (elapsed < 8) {
-        setScanStatusMessage('Locking facial capillary region of interest (ROI)...');
-      } else if (elapsed < 20) {
-        setScanStatusMessage('Sampling optical green channel blood volume pulse (vPPG)...');
-      } else if (elapsed < 35) {
-        setScanStatusMessage('Analyzing inter-beat intervals (IBI) & pulse wave transit time...');
-      } else if (elapsed < 50) {
-        setScanStatusMessage('Extracting HRV parameters (SDNN, RMSSD) & Respiratory Sinus Arrhythmia...');
-      } else if (elapsed < 65) {
-        setScanStatusMessage('Calibrating hemodynamic pressure, arterial metrics & body composition...');
-      } else {
-        setScanStatusMessage('Finalizing clinical estimates and generating your comprehensive report...');
+      // 1. AUTO-PAUSE: If no face detected during camera scan, pause timer immediately!
+      if (!isSimulated && !isFaceDetectedRef.current) {
+        return;
       }
 
-      // Live estimated BPM update
-      const currentBpm = processorRef.current.getLiveHeartRate();
-      setLiveBpm(currentBpm);
+      setScanSecondsElapsed((prev) => {
+        const next = prev + 1;
 
-      // Completion check
-      if (elapsed >= SCAN_DURATION_SECONDS) {
-        if (scanTimerRef.current) clearInterval(scanTimerRef.current);
-        finishScan();
-      }
+        // Status messages updating in real time
+        if (next < 8) {
+          setScanStatusMessage('Locking facial capillary region of interest (ROI)...');
+        } else if (next < 20) {
+          setScanStatusMessage('Sampling optical green channel blood volume pulse (vPPG)...');
+        } else if (next < 35) {
+          setScanStatusMessage('Analyzing inter-beat intervals (IBI) & pulse wave transit time...');
+        } else if (next < 50) {
+          setScanStatusMessage('Extracting HRV parameters (SDNN, RMSSD) & Respiratory Sinus Arrhythmia...');
+        } else if (next < 65) {
+          setScanStatusMessage('Calibrating hemodynamic pressure, arterial metrics & body composition...');
+        } else {
+          setScanStatusMessage('Finalizing clinical estimates and generating your comprehensive report...');
+        }
+
+        // Live estimated BPM update strictly when face is present
+        const currentBpm = processorRef.current.getLiveHeartRate();
+        setLiveBpm(currentBpm);
+
+        // Completion check
+        if (next >= SCAN_DURATION_SECONDS) {
+          if (scanTimerRef.current) clearInterval(scanTimerRef.current);
+          finishScan();
+        }
+        return next;
+      });
     }, 1000);
 
     // 2. Continuous frame extraction from video -> canvas OR synthetic biometric simulation
@@ -465,7 +556,7 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
             ctx.fillRect(0, 0, cw, ch);
 
             drawSimulatedBiometricFace(ctx, cw, ch, performance.now());
-            drawMediaPipeMeshOverlay(ctx, cw, ch);
+            drawMediaPipeMeshOverlay(ctx, cw, ch, true, null);
 
             const now = performance.now();
             const targetBpm = userData.gender === 'Female' ? 74 : 70;
@@ -505,14 +596,50 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
         ctx.drawImage(video, -cw, 0, cw, ch);
         ctx.restore();
 
-        // Biometric Face ROI tracking (forehead and cheeks region)
-        const faceX = cw * 0.35;
-        const faceY = ch * 0.22;
-        const faceW = cw * 0.30;
-        const faceH = ch * 0.35;
+        // 1. Check MediaPipe Face Mesh on every frame
+        if (
+          faceMeshRef.current &&
+          isFaceMeshReadyRef.current &&
+          !faceMeshProcessingRef.current &&
+          video.videoWidth > 0
+        ) {
+          faceMeshProcessingRef.current = true;
+          faceMeshRef.current
+            .send({ image: video })
+            .catch(() => {})
+            .finally(() => {
+              faceMeshProcessingRef.current = false;
+            });
+        }
 
-        // Draw futuristic MediaPipe Face Mesh wireframe overlay
-        drawMediaPipeMeshOverlay(ctx, cw, ch);
+        const faceDetected = isFaceDetectedRef.current;
+
+        // Draw MediaPipe Face Mesh overlay with dynamic landmarks or alert boundary
+        drawMediaPipeMeshOverlay(ctx, cw, ch, faceDetected, latestFaceLandmarksRef.current);
+
+        // 2. AUTO-PAUSE & ALERTS: If no face is detected, pause vitals calculations immediately!
+        // Prevent generating any vital results or fake telemetry until a valid face is present.
+        if (!faceDetected) {
+          animationFrameRef.current = requestAnimationFrame(processFrame);
+          return;
+        }
+
+        // Biometric Face ROI tracking (forehead and cheeks region)
+        let faceX = cw * 0.35;
+        let faceY = ch * 0.22;
+        let faceW = cw * 0.30;
+        let faceH = ch * 0.35;
+
+        if (latestFaceLandmarksRef.current && latestFaceLandmarksRef.current.length >= 468) {
+          const lm = latestFaceLandmarksRef.current;
+          // Landmark 10 is forehead center
+          const fx = (1 - lm[10].x) * cw;
+          const fy = lm[10].y * ch;
+          faceX = Math.max(0, Math.min(cw - 60, fx - cw * 0.15));
+          faceY = Math.max(0, Math.min(ch - 60, fy));
+          faceW = Math.min(cw - faceX, cw * 0.30);
+          faceH = Math.min(ch - faceY, ch * 0.25);
+        }
 
         // Sample optical pixel data from forehead & upper cheeks
         try {
@@ -583,14 +710,64 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
   };
 
   // Draw futuristic Google MediaPipe biometric Face Mesh on top of camera
-  const drawMediaPipeMeshOverlay = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
+  const drawMediaPipeMeshOverlay = (
+    ctx: CanvasRenderingContext2D,
+    w: number,
+    h: number,
+    faceDetected: boolean = true,
+    landmarks: any[] | null = null
+  ) => {
     const cx = w * 0.5;
     const cy = h * 0.46;
     const rx = w * 0.24;
     const ry = h * 0.33;
 
-    // Outer Target Guide Ellipse with purple neon styling
     ctx.save();
+
+    // If face is NOT detected: Draw prominent red alert boundary and corner brackets
+    if (!faceDetected) {
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx, ry, 0, 0, 2 * Math.PI);
+      ctx.strokeStyle = '#ef4444'; // Red alert
+      ctx.lineWidth = 3;
+      ctx.setLineDash([10, 8]);
+      ctx.stroke();
+
+      // Red corner focus brackets
+      const bLen = 22;
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 3.5;
+      ctx.setLineDash([]);
+
+      ctx.beginPath();
+      ctx.moveTo(cx - rx - 10, cy - ry + bLen);
+      ctx.lineTo(cx - rx - 10, cy - ry - 10);
+      ctx.lineTo(cx - rx + bLen, cy - ry - 10);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(cx + rx + 10 - bLen, cy - ry - 10);
+      ctx.lineTo(cx + rx + 10, cy - ry - 10);
+      ctx.lineTo(cx + rx + 10, cy - ry + bLen);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(cx - rx - 10, cy + ry - bLen);
+      ctx.lineTo(cx - rx - 10, cy + ry + 10);
+      ctx.lineTo(cx - rx + bLen, cy + ry + 10);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(cx + rx + 10 - bLen, cy + ry + 10);
+      ctx.lineTo(cx + rx + 10, cy + ry + 10);
+      ctx.lineTo(cx + rx + 10, cy + ry - bLen);
+      ctx.stroke();
+
+      ctx.restore();
+      return;
+    }
+
+    // Outer Target Guide Ellipse with purple neon styling
     ctx.beginPath();
     ctx.ellipse(cx, cy, rx, ry, 0, 0, 2 * Math.PI);
     ctx.strokeStyle = '#a855f7'; // Vibrant purple
@@ -632,51 +809,76 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
     ctx.lineTo(cx + rx + 10, cy + ry - bLen);
     ctx.stroke();
 
-    // Subtle 468-point inspired geometric facial triangulation dots
-    ctx.fillStyle = 'rgba(168, 85, 247, 0.45)';
-    const points = [
-      // Forehead ROI nodes (vPPG sampling)
-      [cx, cy - ry * 0.65],
-      [cx - rx * 0.35, cy - ry * 0.60],
-      [cx + rx * 0.35, cy - ry * 0.60],
-      [cx - rx * 0.65, cy - ry * 0.50],
-      [cx + rx * 0.65, cy - ry * 0.50],
-      // Eyes / Brow ridge
-      [cx - rx * 0.45, cy - ry * 0.25],
-      [cx + rx * 0.45, cy - ry * 0.25],
-      [cx - rx * 0.20, cy - ry * 0.20],
-      [cx + rx * 0.20, cy - ry * 0.20],
-      // Nose bridge and tip
-      [cx, cy - ry * 0.20],
-      [cx, cy],
-      [cx, cy + ry * 0.15],
-      // Cheeks (High vascularity vPPG nodes)
-      [cx - rx * 0.50, cy + ry * 0.10],
-      [cx + rx * 0.50, cy + ry * 0.10],
-      [cx - rx * 0.30, cy + ry * 0.25],
-      [cx + rx * 0.30, cy + ry * 0.25],
-      // Mouth & Jawline
-      [cx, cy + ry * 0.42],
-      [cx - rx * 0.25, cy + ry * 0.45],
-      [cx + rx * 0.25, cy + ry * 0.45],
-      [cx, cy + ry * 0.75],
-    ];
+    // Render MediaPipe FaceMesh landmarks when available, or geometric facial triangulation nodes
+    if (landmarks && landmarks.length >= 468) {
+      // Dynamic MediaPipe 3D Mesh points (mirrored horizontally)
+      ctx.fillStyle = 'rgba(192, 132, 252, 0.7)';
+      const keyIndices = [
+        10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378,
+        400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21,
+        54, 103, 67, 109, 151, 9, 8, 168, 6, 197, 195, 5, 4, 1, 19, 94, 2,
+        61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 146, 91, 181, 84, 17, 314, 405, 321, 375
+      ];
+      keyIndices.forEach((idx) => {
+        const pt = landmarks[idx];
+        if (pt) {
+          const px = (1 - pt.x) * w;
+          const py = pt.y * h;
+          ctx.beginPath();
+          ctx.arc(px, py, 1.8, 0, 2 * Math.PI);
+          ctx.fill();
+        }
+      });
 
-    points.forEach(([px, py]) => {
+      // Forehead optical sampling box
+      const foreheadPt = landmarks[10];
+      if (foreheadPt) {
+        const fx = (1 - foreheadPt.x) * w;
+        const fy = foreheadPt.y * h;
+        ctx.strokeStyle = 'rgba(34, 211, 238, 0.6)';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(fx - 24, fy - 10, 48, 24);
+      }
+    } else {
+      ctx.fillStyle = 'rgba(168, 85, 247, 0.45)';
+      const points = [
+        [cx, cy - ry * 0.65],
+        [cx - rx * 0.35, cy - ry * 0.6],
+        [cx + rx * 0.35, cy - ry * 0.6],
+        [cx - rx * 0.65, cy - ry * 0.5],
+        [cx + rx * 0.65, cy - ry * 0.5],
+        [cx - rx * 0.45, cy - ry * 0.25],
+        [cx + rx * 0.45, cy - ry * 0.25],
+        [cx - rx * 0.2, cy - ry * 0.2],
+        [cx + rx * 0.2, cy - ry * 0.2],
+        [cx, cy - ry * 0.2],
+        [cx, cy],
+        [cx, cy + ry * 0.15],
+        [cx - rx * 0.5, cy + ry * 0.1],
+        [cx + rx * 0.5, cy + ry * 0.1],
+        [cx - rx * 0.3, cy + ry * 0.25],
+        [cx + rx * 0.3, cy + ry * 0.25],
+        [cx, cy + ry * 0.42],
+        [cx - rx * 0.25, cy + ry * 0.45],
+        [cx + rx * 0.25, cy + ry * 0.45],
+        [cx, cy + ry * 0.75],
+      ];
+
+      points.forEach(([px, py]) => {
+        ctx.beginPath();
+        ctx.arc(px, py, 2, 0, 2 * Math.PI);
+        ctx.fill();
+      });
+
+      ctx.strokeStyle = 'rgba(168, 85, 247, 0.25)';
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.arc(px, py, 2, 0, 2 * Math.PI);
-      ctx.fill();
-    });
-
-    // Connecting subtle wireframe lines
-    ctx.strokeStyle = 'rgba(168, 85, 247, 0.25)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (let i = 0; i < points.length - 1; i += 2) {
-      ctx.moveTo(points[i][0], points[i][1]);
-      ctx.lineTo(points[i + 1][0], points[i + 1][1]);
+      for (let i = 0; i < points.length - 1; i += 2) {
+        ctx.moveTo(points[i][0], points[i][1]);
+        ctx.lineTo(points[i + 1][0], points[i + 1][1]);
+      }
+      ctx.stroke();
     }
-    ctx.stroke();
 
     ctx.restore();
   };
@@ -1392,14 +1594,41 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
                   className="w-full h-full object-cover"
                 />
 
+                {/* AUTO-PAUSE & ALERTS: Clear overlay notice when no face detected */}
+                {!isFaceDetected && !isSimulatedScan && (
+                  <div className="absolute inset-0 bg-black/80 backdrop-blur-xs flex flex-col items-center justify-center p-4 z-20 text-center animate-in fade-in duration-200">
+                    <div className="w-16 h-16 rounded-full bg-red-500/20 border-2 border-red-500 flex items-center justify-center text-red-400 mb-3 animate-pulse shadow-lg shadow-red-500/30">
+                      <AlertTriangle className="w-8 h-8 text-red-400" />
+                    </div>
+                    <div className="bg-red-950/85 border border-red-500/60 rounded-2xl px-5 py-3.5 max-w-xs shadow-2xl">
+                      <h5 className="text-white font-bold text-sm tracking-wide">
+                        No Face Detected
+                      </h5>
+                      <p className="text-red-200 text-xs mt-1.5 font-medium leading-relaxed">
+                        Please align your face inside the frame
+                      </p>
+                      <div className="mt-2.5 text-[10px] text-amber-300 font-mono bg-amber-950/70 px-2.5 py-1 rounded-full inline-flex items-center gap-1.5 border border-amber-500/30">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                        <span>Scan Paused • Auto-resumes on alignment</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Top overlay: Live Pulse, Wake Lock Status & Timer */}
                 <div className="absolute top-3 inset-x-3 flex items-center justify-between z-10 pointer-events-none">
                   <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md border border-purple-500/40 text-xs font-black text-white">
-                    <Heart className="w-3.5 h-3.5 text-rose-500 animate-ping" />
-                    <span>{liveBpm} BPM</span>
+                    <Heart className={`w-3.5 h-3.5 ${isFaceDetected ? 'text-rose-500 animate-ping' : 'text-slate-400'}`} />
+                    <span>{isFaceDetected ? `${liveBpm} BPM` : 'Paused'}</span>
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {!isFaceDetected && !isSimulatedScan && (
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-950/80 backdrop-blur-md border border-red-500/50 text-[10px] font-bold text-red-300">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+                        <span>No Face</span>
+                      </div>
+                    )}
                     {isWakeLockActive && (
                       <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/70 backdrop-blur-md border border-emerald-400/40 text-[10px] font-bold text-emerald-300">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -1420,7 +1649,11 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
             {/* Live Progress Bar & Real-Time Feedback */}
             <div className="w-full max-w-md mt-3 space-y-2">
               <div className="flex items-center justify-between text-xs font-semibold">
-                <span className="text-slate-300 text-[11px] truncate">{scanStatusMessage}</span>
+                <span className={`text-[11px] truncate ${!isFaceDetected && !isSimulatedScan ? 'text-amber-400 font-bold' : 'text-slate-300'}`}>
+                  {!isFaceDetected && !isSimulatedScan
+                    ? '⚠️ Scan Paused — Align your face inside the frame to resume'
+                    : scanStatusMessage}
+                </span>
                 <span className="text-purple-400 font-mono font-bold ml-2">{progressPercent}%</span>
               </div>
 

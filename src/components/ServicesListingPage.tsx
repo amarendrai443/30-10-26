@@ -17,6 +17,7 @@ import {
 import { EXTRACTED_SERVICES } from '../data/servicesData';
 import { ServiceItem } from '../types/serviceBooking';
 import { PartnerApplication } from '../types/partner';
+import { NHEALTH_LOGO_FALLBACK_SVG } from '../utils/imageFallback';
 
 interface ServicesListingPageProps {
   onBack: () => void;
@@ -98,22 +99,30 @@ export const ServicesListingPage: React.FC<ServicesListingPageProps> = ({
           <div className="h-6 w-px bg-slate-200 hidden xs:block" />
 
           <a
-            href="https://ibb.co/SDYB7XbW"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 hover:opacity-90 transition-opacity"
-            title="Official Nhealth Logo"
+            href="/"
+            onClick={(e) => {
+              e.preventDefault();
+              onBack();
+            }}
+            className="flex items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer"
+            title="Nhealth Home"
           >
             <img
               src="https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
               alt="Nhealth Logo"
-              className="h-8 sm:h-9 w-auto object-contain shrink-0"
+              className="h-6 sm:h-8 md:h-9 w-auto object-contain shrink-0"
               onError={(e) => {
-                e.currentTarget.src = 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
+                const target = e.currentTarget;
+                target.onerror = null;
+                if (target.src !== 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png') {
+                  target.src = 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
+                } else {
+                  target.src = NHEALTH_LOGO_FALLBACK_SVG;
+                }
               }}
             />
             <div className="flex flex-col">
-              <span className="font-black text-lg sm:text-xl text-[#002b49] tracking-tight leading-tight">
+              <span className="font-black text-base sm:text-lg md:text-xl text-[#002b49] tracking-tight leading-tight">
                 Nhealth<span className="text-[#008080]">™</span>
               </span>
               <span className="text-[10px] font-bold text-[#008080] uppercase tracking-wider hidden sm:inline">

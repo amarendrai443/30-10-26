@@ -367,11 +367,13 @@ export const PartnerApiGatewayPortal: React.FC<PartnerApiGatewayPortalProps> = (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-18 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
             <a
-              href="https://ibb.co/SDYB7XbW"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center shrink-0 shadow-sm border border-teal-400/30 hover:opacity-90"
-              title="Official Nhealth Logo"
+              href="/"
+              onClick={(e) => {
+                e.preventDefault();
+                onNavigateHome();
+              }}
+              className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center shrink-0 shadow-sm border border-teal-400/30 hover:opacity-90 cursor-pointer"
+              title="Nhealth Home"
             >
               <img
                 src="https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"

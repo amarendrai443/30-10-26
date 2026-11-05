@@ -40,6 +40,7 @@ import { EXTRACTED_SERVICES, TIME_SLOTS } from '../data/servicesData';
 import { createOneTimeSecureToken } from '../utils/secureQrToken';
 import { SecureQrTokenCard } from './SecureQrTokenCard';
 import { SecureHealthToken, TokenDepartment } from '../types/secureToken';
+import { NHEALTH_LOGO_FALLBACK_SVG } from '../utils/imageFallback';
 
 export type DedicatedServiceKey =
   | 'doctor-home-visits'
@@ -208,8 +209,8 @@ export const DedicatedServiceDashboard: React.FC<DedicatedServiceDashboardProps>
   // Memoized sticky header to isolate state and prevent UI lags during intra-dashboard updates
   const stickyHeader = useMemo(() => (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs">
-      <div className="max-w-7xl mx-auto px-2.5 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2 sm:gap-4 min-w-0">
-        <div className="flex items-center gap-1.5 sm:gap-3 min-w-0 flex-1">
+      <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-1.5 sm:gap-4 min-w-0">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1">
           <button
             type="button"
             onClick={onBackToHome}
@@ -221,43 +222,48 @@ export const DedicatedServiceDashboard: React.FC<DedicatedServiceDashboardProps>
           </button>
           <div className="h-5 w-px bg-slate-200 hidden sm:block shrink-0" />
           <a
-            href="https://ibb.co/SDYB7XbW"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center shrink-0 hover:opacity-90 transition-opacity"
-            title="Official Nhealth Logo"
+            href="/"
+            onClick={(e) => {
+              e.preventDefault();
+              onBackToHome();
+            }}
+            className="flex items-center shrink-0 hover:opacity-90 transition-opacity cursor-pointer"
+            title="Nhealth Home"
           >
             <img
               src="https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
               alt="Nhealth Logo"
-              className="h-6 sm:h-8 w-auto object-contain shrink-0"
+              className="h-6 sm:h-7 md:h-8 w-auto object-contain shrink-0"
               onError={(e) => {
                 const target = e.currentTarget;
+                target.onerror = null;
                 if (target.src !== 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png') {
                   target.src = 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
+                } else {
+                  target.src = NHEALTH_LOGO_FALLBACK_SVG;
                 }
               }}
             />
           </a>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-[#008080] truncate hidden md:block">
               Nhealth Specialized Services
             </div>
-            <h1 className="text-xs xs:text-sm sm:text-base md:text-lg font-black text-[#002b49] leading-tight truncate">
+            <h1 className="text-xs sm:text-sm md:text-base font-bold text-[#002b49] leading-tight truncate">
               {currentService.name}
             </h1>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             type="button"
             onClick={() => onOpenBookingModal(currentService, `Slot: ${selectedSlot}`)}
             className="px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-gradient-to-r from-[#008080] to-[#006666] hover:from-[#006666] hover:to-[#004d4d] text-white text-xs sm:text-sm font-bold shadow-sm transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 whitespace-nowrap shrink-0"
           >
-            <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span className="hidden xs:inline">Book Appointment</span>
-            <span className="xs:hidden">Book</span>
+            <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span className="hidden lg:inline">Book Appointment</span>
+            <span className="lg:hidden">( Book )</span>
           </button>
         </div>
       </div>

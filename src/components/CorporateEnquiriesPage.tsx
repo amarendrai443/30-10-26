@@ -216,11 +216,13 @@ export const CorporateEnquiriesPage: React.FC<CorporateEnquiriesPageProps> = ({
                 <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
               <a
-                href="https://ibb.co/SDYB7XbW"
-                target="_blank"
-                rel="noopener noreferrer"
+                href="/"
+                onClick={(e) => {
+                  e.preventDefault();
+                  onNavigateHome();
+                }}
                 className="flex items-center gap-2 focus:outline-hidden text-left cursor-pointer hover:opacity-95"
-                title="Official Nhealth Logo"
+                title="Nhealth Home"
               >
                 <img
                   src="https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
@@ -267,7 +269,15 @@ export const CorporateEnquiriesPage: React.FC<CorporateEnquiriesPageProps> = ({
 
               <div className="h-6 w-px bg-slate-200" />
 
-              <div className="flex items-center gap-2">
+              <a
+                href="/"
+                onClick={(e) => {
+                  e.preventDefault();
+                  onNavigateHome();
+                }}
+                className="flex items-center gap-2 hover:opacity-95 cursor-pointer"
+                title="Nhealth Home"
+              >
                 <img
                   src="https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
                   onError={(e) => {
@@ -283,7 +293,7 @@ export const CorporateEnquiriesPage: React.FC<CorporateEnquiriesPageProps> = ({
                   <Building2 className="w-3 h-3" />
                   Enterprise Health
                 </span>
-              </div>
+              </a>
             </div>
 
             <div className="flex items-center gap-4">

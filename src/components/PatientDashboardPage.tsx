@@ -58,6 +58,7 @@ import { VitalMetricsResult, VitalLensUserData } from '../types/vitalLens';
 import { SymptomDoctorFinder } from './SymptomDoctorFinder';
 import { InteractiveGridTabs } from './InteractiveGridTabs';
 import { getStoredGridTabs, GridTabItem } from '../utils/gridTabsStorage';
+import { NHEALTH_LOGO_FALLBACK_SVG } from '../utils/imageFallback';
 import { getStoredPromotions, PromotionItem } from '../utils/promotionsStorage';
 import { usePatientInactivityRefresh } from '../hooks/usePatientInactivityRefresh';
 import { UserNotificationCenter } from './UserNotificationCenter';
@@ -1043,13 +1044,19 @@ export const PatientDashboardPage: React.FC<PatientDashboardPageProps> = ({
             <img
               src="https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png"
               alt="Nhealth Official Logo"
-              className="h-8 sm:h-9 md:h-10 w-auto object-contain rounded-lg shrink-0 group-hover:scale-105 transition-transform shadow-xs"
+              className="h-7 sm:h-8 md:h-10 w-auto object-contain rounded-lg shrink-0 group-hover:scale-105 transition-transform shadow-xs"
               onError={(e) => {
-                e.currentTarget.src = 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
+                const target = e.currentTarget;
+                target.onerror = null;
+                if (target.src !== 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png') {
+                  target.src = 'https://i.ibb.co/JW6HFRV0/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
+                } else {
+                  target.src = NHEALTH_LOGO_FALLBACK_SVG;
+                }
               }}
             />
             <div className="flex flex-col min-w-0">
-              <span className={`text-base sm:text-lg font-black tracking-tight leading-tight transition-colors ${
+              <span className={`text-sm sm:text-base md:text-lg font-black tracking-tight leading-tight transition-colors ${
                 isDark ? 'text-white group-hover:text-cyan-300' : 'text-[#002b49] group-hover:text-[#008080]'
               }`}>
                 Nhealth<span className={isDark ? 'text-cyan-400' : 'text-[#008080]'}>™</span>
