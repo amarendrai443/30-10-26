@@ -85,6 +85,7 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
 
   // Step 4: Camera & Scan State
   const [cameraFacingMode, setCameraFacingMode] = useState<'user' | 'environment'>('user');
+  const cameraFacingModeRef = useRef<'user' | 'environment'>('user');
   const [showCameraPrompt, setShowCameraPrompt] = useState(false);
   const [isSimulatedScan, setIsSimulatedScan] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
@@ -93,6 +94,7 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
   const [scanStatusMessage, setScanStatusMessage] = useState('Positioning face inside biometric boundary...');
   const [liveBpm, setLiveBpm] = useState<number>(72);
   const [isFaceDetected, setIsFaceDetected] = useState(true);
+  const [faceAlignmentWarning, setFaceAlignmentWarning] = useState<string | null>(null);
 
   // MediaPipe Face Mesh Detection Refs
   const faceMeshRef = useRef<any>(null);
@@ -100,6 +102,7 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
   const faceMeshProcessingRef = useRef<boolean>(false);
   const latestFaceLandmarksRef = useRef<any[] | null>(null);
   const isFaceDetectedRef = useRef<boolean>(true);
+  const isFaceAlignedRef = useRef<boolean>(true);
 
   // Step 5: Final Results & PDF Report State
   const [scanResults, setScanResults] = useState<VitalMetricsResult | null>(null);
@@ -121,6 +124,89 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
 
   // Wave points for live vPPG display
   const wavePointsRef = useRef<number[]>([]);
+
+  // Centering & Full-Face Bounding Box Validation using MediaPipe Face Mesh
+  const validateFaceLandmarks = (landmarks: any[] | null): {
+    valid: boolean;
+    warning: string | null;
+    reason: 'no_face' | 'half_face' | 'off_center' | 'ok';
+    bounds?: { minX: number; maxX: number; minY: number; maxY: number; centerX: number; centerY: number };
+  } => {
+    if (!landmarks || landmarks.length < 468) {
+      return { valid: false, warning: 'Align Full Face in Center', reason: 'no_face' };
+    }
+
+    let minX = 1;
+    let maxX = 0;
+    let minY = 1;
+    let maxY = 0;
+
+    for (let i = 0; i < landmarks.length; i++) {
+      const p = landmarks[i];
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+
+    const faceWidth = maxX - minX;
+    const faceHeight = maxY - minY;
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    const forehead = landmarks[10];
+    const chin = landmarks[152];
+    const leftCheek = landmarks[234];
+    const rightCheek = landmarks[454];
+    const nose = landmarks[1];
+    const leftEye = landmarks[33];
+    const rightEye = landmarks[263];
+    const mouth = landmarks[0];
+
+    // 1. Edge boundary clipping & partial/half-face check
+    const isCutOffAtEdge =
+      minX <= 0.04 ||
+      maxX >= 0.96 ||
+      minY <= 0.04 ||
+      maxY >= 0.96 ||
+      (forehead && forehead.y <= 0.03) ||
+      (chin && chin.y >= 0.97) ||
+      (leftCheek && leftCheek.x <= 0.03) ||
+      (rightCheek && rightCheek.x >= 0.97);
+
+    const isTooSmallOrPartial = faceWidth < 0.20 || faceHeight < 0.22;
+
+    const leftCheekSpan = nose && leftCheek ? Math.abs(nose.x - leftCheek.x) : 0;
+    const rightCheekSpan = nose && rightCheek ? Math.abs(nose.x - rightCheek.x) : 0;
+    const isTurnedSideProfile =
+      leftCheekSpan > 0 && rightCheekSpan > 0 &&
+      (leftCheekSpan / rightCheekSpan > 3.6 || rightCheekSpan / leftCheekSpan > 3.6);
+
+    const coreFeaturesVisible =
+      forehead && chin && leftCheek && rightCheek && nose && leftEye && rightEye && mouth &&
+      leftEye.x > 0.05 && leftEye.x < 0.95 &&
+      rightEye.x > 0.05 && rightEye.x < 0.95 &&
+      mouth.y > 0.08 && mouth.y < 0.95;
+
+    if (isCutOffAtEdge || isTooSmallOrPartial || isTurnedSideProfile || !coreFeaturesVisible) {
+      return { valid: false, warning: 'Align Full Face in Center', reason: 'half_face' };
+    }
+
+    // 2. Strict Centering check within the viewfinder
+    const isOffCenterHorizontal = centerX < 0.33 || centerX > 0.67;
+    const isOffCenterVertical = centerY < 0.25 || centerY > 0.69;
+
+    if (isOffCenterHorizontal || isOffCenterVertical) {
+      return { valid: false, warning: 'Please center your full face', reason: 'off_center' };
+    }
+
+    return {
+      valid: true,
+      warning: null,
+      reason: 'ok',
+      bounds: { minX, maxX, minY, maxY, centerX, centerY },
+    };
+  };
 
   // Asynchronous MediaPipe Face Mesh loader & initializer
   const loadMediaPipeScript = (): Promise<void> => {
@@ -157,16 +243,19 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
           minTrackingConfidence: 0.5,
         });
         fm.onResults((results: any) => {
-          // Strict MediaPipe results.multiFaceLandmarks validation on every frame
-          const hasFace = !!(
+          // Camera-agnostic validation of results.multiFaceLandmarks (Front & Back camera)
+          const rawLandmarks =
             results &&
             results.multiFaceLandmarks &&
             results.multiFaceLandmarks.length > 0 &&
             results.multiFaceLandmarks[0].length >= 30
-          );
+              ? results.multiFaceLandmarks[0]
+              : null;
 
-          if (hasFace) {
-            latestFaceLandmarksRef.current = results.multiFaceLandmarks[0];
+          const validation = validateFaceLandmarks(rawLandmarks);
+
+          if (rawLandmarks) {
+            latestFaceLandmarksRef.current = rawLandmarks;
             if (!isFaceDetectedRef.current) {
               isFaceDetectedRef.current = true;
               setIsFaceDetected(true);
@@ -177,6 +266,14 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
               isFaceDetectedRef.current = false;
               setIsFaceDetected(false);
             }
+          }
+
+          if (validation.valid) {
+            isFaceAlignedRef.current = true;
+            setFaceAlignmentWarning(null);
+          } else {
+            isFaceAlignedRef.current = false;
+            setFaceAlignmentWarning(validation.warning);
           }
         });
         await fm.initialize?.();
@@ -386,6 +483,8 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
 
   // Camera Management
   const startCamera = async (mode: 'user' | 'environment' = cameraFacingMode) => {
+    setCameraFacingMode(mode);
+    cameraFacingModeRef.current = mode;
     setCameraError(null);
     setIsSimulatedScan(false);
     // Explicitly re-initialize screen wake lock on camera start/retry
@@ -455,6 +554,7 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
 
   const handleSelectCameraAndStart = async (mode: 'user' | 'environment') => {
     setCameraFacingMode(mode);
+    cameraFacingModeRef.current = mode;
     setShowCameraPrompt(false);
     setCurrentStep(4);
     await startCamera(mode);
@@ -479,6 +579,7 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
     if (isSimulatedScan) return;
     const nextMode = cameraFacingMode === 'user' ? 'environment' : 'user';
     setCameraFacingMode(nextMode);
+    cameraFacingModeRef.current = nextMode;
     await startCamera(nextMode);
   };
 
@@ -498,8 +599,10 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
       isFaceMeshReadyRef.current = false;
     }
     isFaceDetectedRef.current = true;
+    isFaceAlignedRef.current = true;
     latestFaceLandmarksRef.current = null;
     setIsFaceDetected(true);
+    setFaceAlignmentWarning(null);
   };
 
   // Step 4 Scanning and vPPG Extraction Loop
@@ -507,8 +610,8 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
     if (scanTimerRef.current) clearInterval(scanTimerRef.current);
 
     scanTimerRef.current = window.setInterval(() => {
-      // 1. AUTO-PAUSE: If no face detected during camera scan, pause timer immediately!
-      if (!isSimulated && !isFaceDetectedRef.current) {
+      // 1. AUTO-PAUSE: If no face detected or face is not fully centered, pause timer immediately!
+      if (!isSimulated && (!isFaceDetectedRef.current || !isFaceAlignedRef.current)) {
         return;
       }
 
@@ -530,7 +633,7 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
           setScanStatusMessage('Finalizing clinical estimates and generating your comprehensive report...');
         }
 
-        // Live estimated BPM update strictly when face is present
+        // Live estimated BPM update strictly when face is present and centered
         const currentBpm = processorRef.current.getLiveHeartRate();
         setLiveBpm(currentBpm);
 
@@ -556,7 +659,7 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
             ctx.fillRect(0, 0, cw, ch);
 
             drawSimulatedBiometricFace(ctx, cw, ch, performance.now());
-            drawMediaPipeMeshOverlay(ctx, cw, ch, true, null);
+            drawMediaPipeMeshOverlay(ctx, cw, ch, true, null, true);
 
             const now = performance.now();
             const targetBpm = userData.gender === 'Female' ? 74 : 70;
@@ -589,14 +692,19 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
       if (ctx) {
         const cw = canvas.width;
         const ch = canvas.height;
+        const isFrontCamera = cameraFacingModeRef.current === 'user';
 
-        // Draw mirror video
+        // Draw mirror video for front camera, natural video for rear camera
         ctx.save();
-        ctx.scale(-1, 1);
-        ctx.drawImage(video, -cw, 0, cw, ch);
+        if (isFrontCamera) {
+          ctx.scale(-1, 1);
+          ctx.drawImage(video, -cw, 0, cw, ch);
+        } else {
+          ctx.drawImage(video, 0, 0, cw, ch);
+        }
         ctx.restore();
 
-        // 1. Check MediaPipe Face Mesh on every frame
+        // 1. Check MediaPipe Face Mesh on every frame (Front & Back camera)
         if (
           faceMeshRef.current &&
           isFaceMeshReadyRef.current &&
@@ -612,14 +720,21 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
             });
         }
 
-        const faceDetected = isFaceDetectedRef.current;
+        const faceValid = isSimulated || (isFaceDetectedRef.current && isFaceAlignedRef.current);
 
         // Draw MediaPipe Face Mesh overlay with dynamic landmarks or alert boundary
-        drawMediaPipeMeshOverlay(ctx, cw, ch, faceDetected, latestFaceLandmarksRef.current);
+        drawMediaPipeMeshOverlay(
+          ctx,
+          cw,
+          ch,
+          faceValid,
+          latestFaceLandmarksRef.current,
+          isFrontCamera
+        );
 
-        // 2. AUTO-PAUSE & ALERTS: If no face is detected, pause vitals calculations immediately!
-        // Prevent generating any vital results or fake telemetry until a valid face is present.
-        if (!faceDetected) {
+        // 2. AUTO-PAUSE & ALERTS: If face is missing or not fully aligned and centered, pause immediately!
+        // Prevent generating any vital results or fake telemetry until a valid centered face is present.
+        if (!faceValid) {
           animationFrameRef.current = requestAnimationFrame(processFrame);
           return;
         }
@@ -633,7 +748,7 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
         if (latestFaceLandmarksRef.current && latestFaceLandmarksRef.current.length >= 468) {
           const lm = latestFaceLandmarksRef.current;
           // Landmark 10 is forehead center
-          const fx = (1 - lm[10].x) * cw;
+          const fx = isFrontCamera ? (1 - lm[10].x) * cw : lm[10].x * cw;
           const fy = lm[10].y * ch;
           faceX = Math.max(0, Math.min(cw - 60, fx - cw * 0.15));
           faceY = Math.max(0, Math.min(ch - 60, fy));
@@ -714,8 +829,9 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
     ctx: CanvasRenderingContext2D,
     w: number,
     h: number,
-    faceDetected: boolean = true,
-    landmarks: any[] | null = null
+    faceValid: boolean = true,
+    landmarks: any[] | null = null,
+    isFrontCamera: boolean = true
   ) => {
     const cx = w * 0.5;
     const cy = h * 0.46;
@@ -724,8 +840,8 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
 
     ctx.save();
 
-    // If face is NOT detected: Draw prominent red alert boundary and corner brackets
-    if (!faceDetected) {
+    // If face is NOT valid (missing, half-face, or off-center): Draw prominent red alert boundary
+    if (!faceValid) {
       ctx.beginPath();
       ctx.ellipse(cx, cy, rx, ry, 0, 0, 2 * Math.PI);
       ctx.strokeStyle = '#ef4444'; // Red alert
@@ -811,7 +927,7 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
 
     // Render MediaPipe FaceMesh landmarks when available, or geometric facial triangulation nodes
     if (landmarks && landmarks.length >= 468) {
-      // Dynamic MediaPipe 3D Mesh points (mirrored horizontally)
+      // Dynamic MediaPipe 3D Mesh points (mirrored horizontally for front camera, natural for back)
       ctx.fillStyle = 'rgba(192, 132, 252, 0.7)';
       const keyIndices = [
         10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378,
@@ -822,7 +938,7 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
       keyIndices.forEach((idx) => {
         const pt = landmarks[idx];
         if (pt) {
-          const px = (1 - pt.x) * w;
+          const px = isFrontCamera ? (1 - pt.x) * w : pt.x * w;
           const py = pt.y * h;
           ctx.beginPath();
           ctx.arc(px, py, 1.8, 0, 2 * Math.PI);
@@ -833,7 +949,7 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
       // Forehead optical sampling box
       const foreheadPt = landmarks[10];
       if (foreheadPt) {
-        const fx = (1 - foreheadPt.x) * w;
+        const fx = isFrontCamera ? (1 - foreheadPt.x) * w : foreheadPt.x * w;
         const fy = foreheadPt.y * h;
         ctx.strokeStyle = 'rgba(34, 211, 238, 0.6)';
         ctx.lineWidth = 1.5;
@@ -1594,22 +1710,24 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
                   className="w-full h-full object-cover"
                 />
 
-                {/* AUTO-PAUSE & ALERTS: Clear overlay notice when no face detected */}
-                {!isFaceDetected && !isSimulatedScan && (
+                {/* AUTO-PAUSE & ALERTS: Clear overlay notice when no face detected or face is not centered/full */}
+                {(!isFaceDetected || !!faceAlignmentWarning) && !isSimulatedScan && (
                   <div className="absolute inset-0 bg-black/80 backdrop-blur-xs flex flex-col items-center justify-center p-4 z-20 text-center animate-in fade-in duration-200">
                     <div className="w-16 h-16 rounded-full bg-red-500/20 border-2 border-red-500 flex items-center justify-center text-red-400 mb-3 animate-pulse shadow-lg shadow-red-500/30">
                       <AlertTriangle className="w-8 h-8 text-red-400" />
                     </div>
-                    <div className="bg-red-950/85 border border-red-500/60 rounded-2xl px-5 py-3.5 max-w-xs shadow-2xl">
+                    <div className="bg-red-950/90 border border-red-500/60 rounded-2xl px-5 py-3.5 max-w-xs shadow-2xl">
                       <h5 className="text-white font-bold text-sm tracking-wide">
-                        No Face Detected
+                        {faceAlignmentWarning || 'Align Full Face in Center'}
                       </h5>
                       <p className="text-red-200 text-xs mt-1.5 font-medium leading-relaxed">
-                        Please align your face inside the frame
+                        {faceAlignmentWarning === 'Please center your full face'
+                          ? 'Position your full face centrally inside the biometric guide'
+                          : 'Ensure your entire face, eyes, and chin are visible within the frame'}
                       </p>
                       <div className="mt-2.5 text-[10px] text-amber-300 font-mono bg-amber-950/70 px-2.5 py-1 rounded-full inline-flex items-center gap-1.5 border border-amber-500/30">
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
-                        <span>Scan Paused • Auto-resumes on alignment</span>
+                        <span>Scan Paused • {cameraFacingMode === 'environment' ? 'Rear' : 'Front'} Camera</span>
                       </div>
                     </div>
                   </div>
@@ -1618,15 +1736,15 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
                 {/* Top overlay: Live Pulse, Wake Lock Status & Timer */}
                 <div className="absolute top-3 inset-x-3 flex items-center justify-between z-10 pointer-events-none">
                   <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md border border-purple-500/40 text-xs font-black text-white">
-                    <Heart className={`w-3.5 h-3.5 ${isFaceDetected ? 'text-rose-500 animate-ping' : 'text-slate-400'}`} />
-                    <span>{isFaceDetected ? `${liveBpm} BPM` : 'Paused'}</span>
+                    <Heart className={`w-3.5 h-3.5 ${isFaceDetected && !faceAlignmentWarning ? 'text-rose-500 animate-ping' : 'text-slate-400'}`} />
+                    <span>{isFaceDetected && !faceAlignmentWarning ? `${liveBpm} BPM` : 'Paused'}</span>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {!isFaceDetected && !isSimulatedScan && (
+                    {(!isFaceDetected || !!faceAlignmentWarning) && !isSimulatedScan && (
                       <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-950/80 backdrop-blur-md border border-red-500/50 text-[10px] font-bold text-red-300">
                         <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
-                        <span>No Face</span>
+                        <span>{faceAlignmentWarning ? 'Uncentered' : 'No Face'}</span>
                       </div>
                     )}
                     {isWakeLockActive && (
@@ -1649,9 +1767,9 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
             {/* Live Progress Bar & Real-Time Feedback */}
             <div className="w-full max-w-md mt-3 space-y-2">
               <div className="flex items-center justify-between text-xs font-semibold">
-                <span className={`text-[11px] truncate ${!isFaceDetected && !isSimulatedScan ? 'text-amber-400 font-bold' : 'text-slate-300'}`}>
-                  {!isFaceDetected && !isSimulatedScan
-                    ? '⚠️ Scan Paused — Align your face inside the frame to resume'
+                <span className={`text-[11px] truncate ${(!isFaceDetected || !!faceAlignmentWarning) && !isSimulatedScan ? 'text-amber-400 font-bold' : 'text-slate-300'}`}>
+                  {(!isFaceDetected || !!faceAlignmentWarning) && !isSimulatedScan
+                    ? `⚠️ Scan Paused — ${faceAlignmentWarning || 'Align Full Face in Center'}`
                     : scanStatusMessage}
                 </span>
                 <span className="text-purple-400 font-mono font-bold ml-2">{progressPercent}%</span>
