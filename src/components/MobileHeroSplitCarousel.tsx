@@ -1,28 +1,23 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { HEALTHCARE_FALLBACK_SVG, NHEALTH_LOGO_FALLBACK_SVG } from '../utils/imageFallback';
 
-const NHEALTH_OFFICIAL_LOGO = '/nhealth_logo.png';
-const NHEALTH_LOGO_FALLBACK = '/nhealth_logo.png';
+const NHEALTH_OFFICIAL_LOGO = '/images/Nhealth_logo_8cm_x_8cm_high_quality-3.png';
+const NHEALTH_LOGO_FALLBACK = '/Nhealth_logo_8cm_x_8cm_high_quality-3.png';
 
-// Strict Hero Carousel Image Array matching local public/images/ assets
-export const heroImages = [
-  "/images/hero-1.png",
-  "/images/hero-2.png",
-  "/images/hero-3.png",
-  "/images/hero-4.png",
-  "/images/hero-5.png",
-  "/images/hero-6.png",
-  "/images/hero-7.png",
-  "/images/hero-8.png",
-  "/images/hero-9.png",
-  "/images/hero-10.png",
-  "/images/hero-11.png",
-  "/images/hero-12.png",
-  "/images/hero-13.png",
-  "/images/hero-14.png",
+// Strict 70% Carousel Images from public/images/
+export const mobileHero70Images = [
+  "/images/bedside assistance.png",
+  "/images/Pharmacy to home.png",
+  "/images/home X-ray Services.png",
+  "/images/online doctor consultations.png",
+  "/images/physiotherapy.png",
+  "/images/pre booking opd services.png",
+  "/images/premium opd services.png",
 ];
 
-export const MOBILE_HERO_SLIDES = heroImages.map((img, idx) => ({
+export const heroImages = mobileHero70Images;
+
+export const MOBILE_HERO_SLIDES = mobileHero70Images.map((img, idx) => ({
   id: `hero-${idx + 1}`,
   directUrl: img,
   title: `Healthcare Service ${idx + 1}`,
@@ -83,7 +78,7 @@ export const MobileHeroSplitCarousel: React.FC<MobileHeroSplitCarouselProps> = (
     >
       {/* LEFT 30% CONTAINER: Standard Official Nhealth Company Logo */}
       <div
-        className="w-[30%] h-full bg-white flex items-center justify-center p-2 sm:p-3.5 shrink-0 z-10 relative"
+        className="w-[30%] h-full bg-white flex items-center justify-center p-1.5 sm:p-2.5 shrink-0 z-10 relative overflow-hidden"
         style={{ backgroundColor: '#ffffff' }}
       >
         <a
@@ -92,14 +87,17 @@ export const MobileHeroSplitCarousel: React.FC<MobileHeroSplitCarouselProps> = (
             e.preventDefault();
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
-          className="w-full h-full flex items-center justify-center focus:outline-none cursor-pointer"
+          className="w-full h-full flex items-center justify-center focus:outline-none cursor-pointer bg-white"
+          style={{ backgroundColor: '#ffffff' }}
           title="Nhealth - Healthcare at Home"
         >
           <img
             src={NHEALTH_OFFICIAL_LOGO}
             alt="Nhealth Official Logo"
             loading="eager"
-            className="max-h-full max-w-full object-contain transition-transform duration-300 hover:scale-105"
+            decoding="sync"
+            className="w-full h-full object-contain p-1 sm:p-1.5 bg-white transition-transform duration-300 hover:scale-105"
+            style={{ backgroundColor: '#ffffff' }}
             onError={(e) => {
               const target = e.currentTarget;
               target.onerror = null;
@@ -137,7 +135,13 @@ export const MobileHeroSplitCarousel: React.FC<MobileHeroSplitCarouselProps> = (
                 onError={(e) => {
                   const target = e.currentTarget;
                   target.onerror = null;
-                  target.src = HEALTHCARE_FALLBACK_SVG;
+                  const rootFallback = imgSrc.replace('/images/', '/');
+                  if (!target.dataset.triedRoot && rootFallback !== imgSrc) {
+                    target.dataset.triedRoot = 'true';
+                    target.src = rootFallback;
+                  } else {
+                    target.src = HEALTHCARE_FALLBACK_SVG;
+                  }
                 }}
               />
               {/* Subtle gradient vignette at bottom for contrast */}
