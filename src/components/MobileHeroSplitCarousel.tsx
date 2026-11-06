@@ -13,6 +13,9 @@ export const mobileHero70Images = [
   "/images/physiotherapy.png",
   "/images/pre booking opd services.png",
   "/images/premium opd services.png",
+  "/images/eldercare-hero.png",
+  "/images/labtest-at-home.png",
+  "/images/doctor-home-visits.png",
 ];
 
 export const heroImages = mobileHero70Images;
