@@ -103,6 +103,10 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
   const latestFaceLandmarksRef = useRef<any[] | null>(null);
   const isFaceDetectedRef = useRef<boolean>(true);
   const isFaceAlignedRef = useRef<boolean>(true);
+  const faceAlignmentWarningRef = useRef<string | null>(null);
+  const lastFaceMeshInferTimeRef = useRef<number>(0);
+  const lastWaveformDrawTimeRef = useRef<number>(0);
+  const offscreenFaceCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Step 5: Final Results & PDF Report State
   const [scanResults, setScanResults] = useState<VitalMetricsResult | null>(null);
@@ -278,12 +282,11 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
             }
           }
 
-          if (validation.valid) {
-            isFaceAlignedRef.current = true;
-            setFaceAlignmentWarning(null);
-          } else {
-            isFaceAlignedRef.current = false;
-            setFaceAlignmentWarning(validation.warning);
+          const targetWarning = validation.valid ? null : validation.warning;
+          isFaceAlignedRef.current = validation.valid;
+          if (faceAlignmentWarningRef.current !== targetWarning) {
+            faceAlignmentWarningRef.current = targetWarning;
+            setFaceAlignmentWarning(targetWarning);
           }
         });
         await fm.initialize?.();
@@ -594,13 +597,34 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
   };
 
   const stopCamera = () => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    if (scanTimerRef.current) {
+      clearInterval(scanTimerRef.current);
+      scanTimerRef.current = null;
+    }
     if (cameraStream) {
-      cameraStream.getTracks().forEach((track) => track.stop());
+      cameraStream.getTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch {}
+      });
       setCameraStream(null);
     }
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
+    if (canvasRef.current) {
+      const ctx = canvasRef.current.getContext('2d');
+      if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    }
+    if (waveCanvasRef.current) {
+      const ctx = waveCanvasRef.current.getContext('2d');
+      if (ctx) ctx.clearRect(0, 0, waveCanvasRef.current.width, waveCanvasRef.current.height);
+    }
+    wavePointsRef.current = [];
     if (faceMeshRef.current) {
       try {
         faceMeshRef.current.close();
@@ -608,8 +632,10 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
       faceMeshRef.current = null;
       isFaceMeshReadyRef.current = false;
     }
+    faceMeshProcessingRef.current = false;
     isFaceDetectedRef.current = true;
     isFaceAlignedRef.current = true;
+    faceAlignmentWarningRef.current = null;
     latestFaceLandmarksRef.current = null;
     setIsFaceDetected(true);
     setFaceAlignmentWarning(null);
@@ -683,7 +709,10 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
             if (wavePointsRef.current.length > 90) {
               wavePointsRef.current.shift();
             }
-            drawPPGWaveform();
+            if (now - lastWaveformDrawTimeRef.current >= 32) {
+              lastWaveformDrawTimeRef.current = now;
+              drawPPGWaveform();
+            }
           }
         }
         animationFrameRef.current = requestAnimationFrame(processFrame);
@@ -714,20 +743,33 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
         }
         ctx.restore();
 
-        // 1. Check MediaPipe Face Mesh on every frame (Front & Back camera)
+        // 1. Optimized MediaPipe Face Mesh: downscale frame to 320x240 and throttle inference to ~20 FPS
+        const now = performance.now();
         if (
           faceMeshRef.current &&
           isFaceMeshReadyRef.current &&
           !faceMeshProcessingRef.current &&
-          video.videoWidth > 0
+          video.videoWidth > 0 &&
+          now - lastFaceMeshInferTimeRef.current >= 45
         ) {
-          faceMeshProcessingRef.current = true;
-          faceMeshRef.current
-            .send({ image: video })
-            .catch(() => {})
-            .finally(() => {
-              faceMeshProcessingRef.current = false;
-            });
+          lastFaceMeshInferTimeRef.current = now;
+          if (!offscreenFaceCanvasRef.current) {
+            offscreenFaceCanvasRef.current = document.createElement('canvas');
+            offscreenFaceCanvasRef.current.width = 320;
+            offscreenFaceCanvasRef.current.height = 240;
+          }
+          const offCanvas = offscreenFaceCanvasRef.current;
+          const offCtx = offCanvas.getContext('2d', { willReadFrequently: true });
+          if (offCtx) {
+            offCtx.drawImage(video, 0, 0, 320, 240);
+            faceMeshProcessingRef.current = true;
+            faceMeshRef.current
+              .send({ image: offCanvas })
+              .catch(() => {})
+              .finally(() => {
+                faceMeshProcessingRef.current = false;
+              });
+          }
         }
 
         const faceValid = isSimulated || (isFaceDetectedRef.current && isFaceAlignedRef.current);
@@ -794,7 +836,10 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
           if (wavePointsRef.current.length > 90) {
             wavePointsRef.current.shift();
           }
-          drawPPGWaveform();
+          if (now - lastWaveformDrawTimeRef.current >= 32) {
+            lastWaveformDrawTimeRef.current = now;
+            drawPPGWaveform();
+          }
         } catch {
           // Ignore occasional canvas read glitches
         }
@@ -1657,9 +1702,9 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
         {/* STEP 4: Live Camera Scan View (MediaPipe Face Mesh Integration) */}
         {currentStep === 4 && (
           <div className="p-4 sm:p-6 flex-1 flex flex-col items-center justify-between text-center overflow-y-auto">
-            {/* Live VPPG Capillary Pulse Wave Monitor (Replaces removed redundant section above camera to keep camera screen 100% unobstructed) */}
-            <div className="w-full max-w-[420px] bg-[#00172b]/95 border border-purple-500/40 rounded-2xl p-2.5 mb-2 shadow-lg shrink-0">
-              <div className="flex items-center justify-between text-[11px] font-bold text-slate-300 mb-1.5 px-1">
+            {/* Live VPPG Capillary Pulse Wave Monitor (Compact footprint on desktop) */}
+            <div className="w-full max-w-[420px] md:max-w-2xl lg:max-w-3xl bg-[#00172b]/95 border border-purple-500/40 rounded-2xl p-2 sm:p-2.5 md:py-1.5 md:px-3 mb-1.5 shadow-lg shrink-0 transition-all duration-300">
+              <div className="flex items-center justify-between text-[11px] font-bold text-slate-300 mb-1 px-1">
                 <span className="flex items-center gap-1.5 text-purple-300">
                   <Activity className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
                   <span>Live VPPG Capillary Pulse Wave</span>
@@ -1668,12 +1713,12 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
                   {isSimulatedScan ? 'Clinical Synthetic vPPG' : '70 FPS Optical Filter'}
                 </span>
               </div>
-              <div className="bg-black/60 rounded-xl p-1.5 border border-purple-500/20">
+              <div className="bg-black/60 rounded-xl p-1 md:py-0.5 border border-purple-500/20">
                 <canvas
                   ref={waveCanvasRef}
-                  width={420}
-                  height={46}
-                  className="w-full h-11 block rounded-lg"
+                  width={640}
+                  height={32}
+                  className="w-full h-8 sm:h-9 md:h-6 block rounded-lg"
                 />
               </div>
             </div>
@@ -1702,7 +1747,7 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
                 </div>
               </div>
             ) : (
-              <div className="relative w-full max-w-[420px] aspect-[4/3] rounded-3xl overflow-hidden border-2 border-purple-500/50 shadow-2xl bg-black my-1">
+              <div className="relative w-full max-w-[420px] sm:max-w-[480px] md:max-w-[580px] lg:max-w-[680px] xl:max-w-[740px] aspect-[4/3] rounded-3xl overflow-hidden border-2 border-purple-500/50 shadow-2xl bg-black my-1 transition-all duration-300">
                 {/* Hidden video element for feed */}
                 <video
                   ref={videoRef}
@@ -1715,8 +1760,8 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
                 {/* Main Biometric Tracking Canvas - 100% Unobstructed */}
                 <canvas
                   ref={canvasRef}
-                  width={480}
-                  height={360}
+                  width={640}
+                  height={480}
                   className="w-full h-full object-cover"
                 />
 
@@ -1777,7 +1822,7 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
             )}
 
             {/* Live Progress Bar & Real-Time Feedback */}
-            <div className="w-full max-w-md mt-3 space-y-2">
+            <div className="w-full max-w-[420px] md:max-w-2xl lg:max-w-3xl mt-2 md:mt-1.5 space-y-1.5 transition-all duration-300">
               <div className="flex items-center justify-between text-xs font-semibold">
                 <span className={`text-[11px] truncate ${(!isFaceDetected || !!faceAlignmentWarning) && !isSimulatedScan ? 'text-amber-400 font-bold' : 'text-slate-300'}`}>
                   {(!isFaceDetected || !!faceAlignmentWarning) && !isSimulatedScan
