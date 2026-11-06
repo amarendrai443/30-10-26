@@ -91,7 +91,7 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [scanSecondsElapsed, setScanSecondsElapsed] = useState(0);
-  const [scanStatusMessage, setScanStatusMessage] = useState('Positioning face inside biometric boundary...');
+  const [scanStatusMessage, setScanStatusMessage] = useState('Scanning Vitals... Align face in center');
   const [liveBpm, setLiveBpm] = useState<number>(72);
   const [isFaceDetected, setIsFaceDetected] = useState(true);
   const [faceAlignmentWarning, setFaceAlignmentWarning] = useState<string | null>(null);
@@ -125,15 +125,15 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
   // Wave points for live vPPG display
   const wavePointsRef = useRef<number[]>([]);
 
-  // Centering & Full-Face Bounding Box Validation using MediaPipe Face Mesh
+  // Calibrated Bounding Box & Face Alignment Validation with Flexible Sensitivity
   const validateFaceLandmarks = (landmarks: any[] | null): {
     valid: boolean;
     warning: string | null;
-    reason: 'no_face' | 'half_face' | 'off_center' | 'ok';
-    bounds?: { minX: number; maxX: number; minY: number; maxY: number; centerX: number; centerY: number };
+    reason: 'no_face' | 'half_face' | 'too_far' | 'turned_away' | 'off_center' | 'ok';
+    bounds?: { minX: number; maxX: number; minY: number; maxY: number; centerX: number; centerY: number; area: number };
   } => {
-    if (!landmarks || landmarks.length < 468) {
-      return { valid: false, warning: 'Align Full Face in Center', reason: 'no_face' };
+    if (!landmarks || landmarks.length < 30) {
+      return { valid: false, warning: 'Face not aligned — Scanning Paused', reason: 'no_face' };
     }
 
     let minX = 1;
@@ -151,6 +151,7 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
 
     const faceWidth = maxX - minX;
     const faceHeight = maxY - minY;
+    const faceArea = faceWidth * faceHeight;
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
 
@@ -163,48 +164,53 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
     const rightEye = landmarks[263];
     const mouth = landmarks[0];
 
-    // 1. Edge boundary clipping & partial/half-face check
-    const isCutOffAtEdge =
-      minX <= 0.04 ||
-      maxX >= 0.96 ||
-      minY <= 0.04 ||
-      maxY >= 0.96 ||
-      (forehead && forehead.y <= 0.03) ||
-      (chin && chin.y >= 0.97) ||
-      (leftCheek && leftCheek.x <= 0.03) ||
-      (rightCheek && rightCheek.x >= 0.97);
-
-    const isTooSmallOrPartial = faceWidth < 0.20 || faceHeight < 0.22;
-
-    const leftCheekSpan = nose && leftCheek ? Math.abs(nose.x - leftCheek.x) : 0;
-    const rightCheekSpan = nose && rightCheek ? Math.abs(nose.x - rightCheek.x) : 0;
-    const isTurnedSideProfile =
-      leftCheekSpan > 0 && rightCheekSpan > 0 &&
-      (leftCheekSpan / rightCheekSpan > 3.6 || rightCheekSpan / leftCheekSpan > 3.6);
-
-    const coreFeaturesVisible =
-      forehead && chin && leftCheek && rightCheek && nose && leftEye && rightEye && mouth &&
-      leftEye.x > 0.05 && leftEye.x < 0.95 &&
-      rightEye.x > 0.05 && rightEye.x < 0.95 &&
-      mouth.y > 0.08 && mouth.y < 0.95;
-
-    if (isCutOffAtEdge || isTooSmallOrPartial || isTurnedSideProfile || !coreFeaturesVisible) {
-      return { valid: false, warning: 'Align Full Face in Center', reason: 'half_face' };
+    // 1. Partial / Half Face Check: Landmarks cut off outside video frame or core anchors missing
+    const isCutOffAtFrameBoundary = minX <= 0.015 || maxX >= 0.985 || minY <= 0.015 || maxY >= 0.985;
+    const hasCoreAnchors = forehead && chin && leftCheek && rightCheek && nose && leftEye && rightEye && mouth;
+    if (isCutOffAtFrameBoundary || !hasCoreAnchors) {
+      return { valid: false, warning: 'Face not aligned — Scanning Paused', reason: 'half_face' };
     }
 
-    // 2. Strict Centering check within the viewfinder
-    const isOffCenterHorizontal = centerX < 0.33 || centerX > 0.67;
-    const isOffCenterVertical = centerY < 0.25 || centerY > 0.69;
+    // 2. Distance Check: User moved too far away from the lens (bounding area < calibrated threshold)
+    if (faceWidth < 0.15 || faceHeight < 0.17 || faceArea < 0.03) {
+      return { valid: false, warning: 'Face not aligned — Scanning Paused', reason: 'too_far' };
+    }
+
+    // 3. Head Turn & Tilt Check:
+    // Yaw: check cheek distance asymmetry from central nose bridge
+    const leftSpan = Math.abs(nose.x - leftCheek.x);
+    const rightSpan = Math.abs(nose.x - rightCheek.x);
+    const isTurnedAway =
+      leftSpan > 0 &&
+      rightSpan > 0 &&
+      (leftSpan / Math.max(0.005, rightSpan) > 3.0 || rightSpan / Math.max(0.005, leftSpan) > 3.0);
+
+    // Pitch / Tilt: eye slope and vertical landmark hierarchy
+    const eyeTilt = Math.abs(leftEye.y - rightEye.y);
+    const isTiltedAway =
+      eyeTilt > 0.13 ||
+      nose.y < Math.min(leftEye.y, rightEye.y) - 0.02 ||
+      chin.y < nose.y + 0.035;
+
+    if (isTurnedAway || isTiltedAway) {
+      return { valid: false, warning: 'Face not aligned — Scanning Paused', reason: 'turned_away' };
+    }
+
+    // 4. Flexible Bounding Box & Sensitivity Calibration:
+    // Calibrated ROI range [0.26, 0.74] and [0.19, 0.76]
+    // Triggers smoothly even if slightly off-center or partially overlapping guide, tolerating hand movement
+    const isOffCenterHorizontal = centerX < 0.26 || centerX > 0.74;
+    const isOffCenterVertical = centerY < 0.19 || centerY > 0.76;
 
     if (isOffCenterHorizontal || isOffCenterVertical) {
-      return { valid: false, warning: 'Please center your full face', reason: 'off_center' };
+      return { valid: false, warning: 'Face not aligned — Scanning Paused', reason: 'off_center' };
     }
 
     return {
       valid: true,
       warning: null,
       reason: 'ok',
-      bounds: { minX, maxX, minY, maxY, centerX, centerY },
+      bounds: { minX, maxX, minY, maxY, centerX, centerY, area: faceArea },
     };
   };
 
@@ -618,19 +624,19 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
       setScanSecondsElapsed((prev) => {
         const next = prev + 1;
 
-        // Status messages updating in real time
+        // Active scanning vitals status updating in real time
         if (next < 8) {
-          setScanStatusMessage('Locking facial capillary region of interest (ROI)...');
+          setScanStatusMessage('Scanning Vitals... Locking facial capillary ROI');
         } else if (next < 20) {
-          setScanStatusMessage('Sampling optical green channel blood volume pulse (vPPG)...');
+          setScanStatusMessage('Scanning Vitals... Sampling optical green blood pulse (vPPG)');
         } else if (next < 35) {
-          setScanStatusMessage('Analyzing inter-beat intervals (IBI) & pulse wave transit time...');
+          setScanStatusMessage('Scanning Vitals... Analyzing inter-beat intervals (IBI)');
         } else if (next < 50) {
-          setScanStatusMessage('Extracting HRV parameters (SDNN, RMSSD) & Respiratory Sinus Arrhythmia...');
+          setScanStatusMessage('Scanning Vitals... Extracting HRV parameters (SDNN, RMSSD)');
         } else if (next < 65) {
-          setScanStatusMessage('Calibrating hemodynamic pressure, arterial metrics & body composition...');
+          setScanStatusMessage('Scanning Vitals... Calibrating hemodynamic pressure & arterial metrics');
         } else {
-          setScanStatusMessage('Finalizing clinical estimates and generating your comprehensive report...');
+          setScanStatusMessage('Scanning Vitals... Finalizing comprehensive clinical report');
         }
 
         // Live estimated BPM update strictly when face is present and centered
@@ -739,21 +745,21 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
           return;
         }
 
-        // Biometric Face ROI tracking (forehead and cheeks region)
-        let faceX = cw * 0.35;
-        let faceY = ch * 0.22;
-        let faceW = cw * 0.30;
-        let faceH = ch * 0.35;
+        // Biometric Face ROI tracking (forehead and cheeks region) with expanded tolerance
+        let faceX = cw * 0.30;
+        let faceY = ch * 0.20;
+        let faceW = cw * 0.40;
+        let faceH = ch * 0.36;
 
-        if (latestFaceLandmarksRef.current && latestFaceLandmarksRef.current.length >= 468) {
+        if (latestFaceLandmarksRef.current && latestFaceLandmarksRef.current.length >= 30) {
           const lm = latestFaceLandmarksRef.current;
           // Landmark 10 is forehead center
           const fx = isFrontCamera ? (1 - lm[10].x) * cw : lm[10].x * cw;
           const fy = lm[10].y * ch;
-          faceX = Math.max(0, Math.min(cw - 60, fx - cw * 0.15));
-          faceY = Math.max(0, Math.min(ch - 60, fy));
-          faceW = Math.min(cw - faceX, cw * 0.30);
-          faceH = Math.min(ch - faceY, ch * 0.25);
+          faceX = Math.max(0, Math.min(cw - 80, fx - cw * 0.18));
+          faceY = Math.max(0, Math.min(ch - 80, fy));
+          faceW = Math.min(cw - faceX, cw * 0.36);
+          faceH = Math.min(ch - faceY, ch * 0.30);
         }
 
         // Sample optical pixel data from forehead & upper cheeks
@@ -1716,18 +1722,16 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
                     <div className="w-16 h-16 rounded-full bg-red-500/20 border-2 border-red-500 flex items-center justify-center text-red-400 mb-3 animate-pulse shadow-lg shadow-red-500/30">
                       <AlertTriangle className="w-8 h-8 text-red-400" />
                     </div>
-                    <div className="bg-red-950/90 border border-red-500/60 rounded-2xl px-5 py-3.5 max-w-xs shadow-2xl">
+                    <div className="bg-slate-950/95 border border-amber-500/60 rounded-2xl px-5 py-3.5 max-w-xs shadow-2xl">
                       <h5 className="text-white font-bold text-sm tracking-wide">
-                        {faceAlignmentWarning || 'Align Full Face in Center'}
+                        {faceAlignmentWarning || 'Face not aligned — Scanning Paused'}
                       </h5>
-                      <p className="text-red-200 text-xs mt-1.5 font-medium leading-relaxed">
-                        {faceAlignmentWarning === 'Please center your full face'
-                          ? 'Position your full face centrally inside the biometric guide'
-                          : 'Ensure your entire face, eyes, and chin are visible within the frame'}
+                      <p className="text-amber-200 text-xs mt-1.5 font-medium leading-relaxed">
+                        Re-align full face inside the central guide circle. Scanning resumes automatically.
                       </p>
-                      <div className="mt-2.5 text-[10px] text-amber-300 font-mono bg-amber-950/70 px-2.5 py-1 rounded-full inline-flex items-center gap-1.5 border border-amber-500/30">
+                      <div className="mt-2.5 text-[10px] text-amber-300 font-mono bg-amber-950/80 px-2.5 py-1 rounded-full inline-flex items-center gap-1.5 border border-amber-500/30">
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
-                        <span>Scan Paused • {cameraFacingMode === 'environment' ? 'Rear' : 'Front'} Camera</span>
+                        <span>Scanning Paused • {cameraFacingMode === 'environment' ? 'Rear' : 'Front'} Camera</span>
                       </div>
                     </div>
                   </div>
@@ -1742,9 +1746,9 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
 
                   <div className="flex items-center gap-2">
                     {(!isFaceDetected || !!faceAlignmentWarning) && !isSimulatedScan && (
-                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-950/80 backdrop-blur-md border border-red-500/50 text-[10px] font-bold text-red-300">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
-                        <span>{faceAlignmentWarning ? 'Uncentered' : 'No Face'}</span>
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-950/80 backdrop-blur-md border border-amber-500/50 text-[10px] font-bold text-amber-300">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                        <span>Alignment Paused</span>
                       </div>
                     )}
                     {isWakeLockActive && (
@@ -1769,7 +1773,7 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
               <div className="flex items-center justify-between text-xs font-semibold">
                 <span className={`text-[11px] truncate ${(!isFaceDetected || !!faceAlignmentWarning) && !isSimulatedScan ? 'text-amber-400 font-bold' : 'text-slate-300'}`}>
                   {(!isFaceDetected || !!faceAlignmentWarning) && !isSimulatedScan
-                    ? `⚠️ Scan Paused — ${faceAlignmentWarning || 'Align Full Face in Center'}`
+                    ? `⚠️ ${faceAlignmentWarning || 'Face not aligned — Scanning Paused'}`
                     : scanStatusMessage}
                 </span>
                 <span className="text-purple-400 font-mono font-bold ml-2">{progressPercent}%</span>

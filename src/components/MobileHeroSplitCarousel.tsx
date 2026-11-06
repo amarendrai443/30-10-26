@@ -1,97 +1,42 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { HEALTHCARE_FALLBACK_SVG, NHEALTH_LOGO_FALLBACK_SVG } from '../utils/imageFallback';
 
-// Nhealth standard company logo from https://ibb.co/7xFjPBHp
-const NHEALTH_OFFICIAL_LOGO = 'https://i.ibb.co/DPnzhmNM/Nhealth-logo-8cm-x-8cm-high-quality-3.png';
+const NHEALTH_OFFICIAL_LOGO = '/nhealth_logo.png';
 const NHEALTH_LOGO_FALLBACK = '/nhealth_logo.png';
 
-// 14 Sequential hero showcase images
-export const MOBILE_HERO_SLIDES = [
-  {
-    id: 'hero-doctor-consultations',
-    directUrl: 'https://i.ibb.co/LXXWyKKG/Gemini-Generated-Image-veitu3veitu3veit.png',
-    title: 'Healthcare at Home - Doctor Consultations',
-    targetRoute: '/online-consultation',
-  },
-  {
-    id: 'hero-home-diagnostics',
-    directUrl: 'https://i.ibb.co/NnL0Cn0C/Gemini-Generated-Image-fdjjkhfdjjkhfdjj.png',
-    title: 'Home Diagnostics & Phlebotomy',
-    targetRoute: '/services?id=home-diagnostics-lab-tests',
-  },
-  {
-    id: 'hero-specialized-nursing',
-    directUrl: 'https://i.ibb.co/B2ymqK4L/Gemini-Generated-Image-11xdtq11xdtq11xd.png',
-    title: 'Specialized Nursing Care at Home',
-    targetRoute: '/services?id=specialized-nursing-care',
-  },
-  {
-    id: 'hero-doorstep-pharmacy',
-    directUrl: 'https://i.ibb.co/DHpnGnDC/Gemini-Generated-Image-6u7tr76u7tr76u7t.png',
-    title: 'Doorstep Pharmacy & Medicine Delivery',
-    targetRoute: '/doorstep-pharmacy',
-  },
-  {
-    id: 'hero-home-xray',
-    directUrl: 'https://i.ibb.co/gbBfmvMD/Gemini-Generated-Image-w46p8fw46p8fw46p.png',
-    title: 'Portable Home X-Ray & Imaging',
-    targetRoute: '/services?id=xray-portable-diagnostics',
-  },
-  {
-    id: 'hero-bedside-assistance',
-    directUrl: 'https://i.ibb.co/S7VLqYfK/Gemini-Generated-Image-j8lndj8lndj8lndj.png',
-    title: 'Bedside Assistance & Attendant Care',
-    targetRoute: '/services?id=bedside-assistance',
-  },
-  {
-    id: 'hero-elder-care',
-    directUrl: 'https://i.ibb.co/Xk4CK4Qb/Gemini-Generated-Image-v8hyj4v8hyj4v8hy.png',
-    title: 'Elder Care & Senior Living Support',
-    targetRoute: '/services?id=eldercare-senior-assistance',
-  },
-  {
-    id: 'hero-home-physiotherapy',
-    directUrl: 'https://i.ibb.co/bYj1sz2/Gemini-Generated-Image-wmpehewmpehewmpe.png',
-    title: 'Home Physiotherapy & Rehabilitation',
-    targetRoute: '/services?id=physiotherapy-at-home',
-  },
-  {
-    id: 'hero-online-doctor',
-    directUrl: 'https://i.ibb.co/QjjjLH99/Gemini-Generated-Image-t3oaczt3oaczt3oa.png',
-    title: 'Online Doctor & Specialist Teleconsultations',
-    targetRoute: '/online-consultation',
-  },
-  {
-    id: 'hero-ambulance-emergency',
-    directUrl: 'https://i.ibb.co/TD6JvGtJ/Gemini-Generated-Image-wm28q4wm28q4wm28.png',
-    title: '24/7 Smart Ambulance & Emergency SOS',
-    targetRoute: '/services?id=ambulance-medical-transport',
-  },
-  {
-    id: 'hero-blood-bank',
-    directUrl: 'https://i.ibb.co/NgczQvxr/Gemini-Generated-Image-xh1vf8xh1vf8xh1v.png',
-    title: 'Blood Bank Network & Donor Support',
-    targetRoute: '/services?id=blood-bank-network',
-  },
-  {
-    id: 'hero-dental-care',
-    directUrl: 'https://i.ibb.co/Z1XfLgbh/Gemini-Generated-Image-b2p66ob2p66ob2p6.png',
-    title: 'Dental Care & Oral Hygiene at Home',
-    targetRoute: '/services?id=dental-care-at-home',
-  },
-  {
-    id: 'hero-hospital-opd',
-    directUrl: 'https://i.ibb.co/Xf7FhNNw/Gemini-Generated-Image-c46m09c46m09c46m.png',
-    title: 'Premium Hospital OPD Assistance',
-    targetRoute: '/services?id=priority-opd-specialist-checkin',
-  },
-  {
-    id: 'hero-care-rider',
-    directUrl: 'https://i.ibb.co/B5sDXFGT/Gemini-Generated-Image-a2mrwsa2mrwsa2mr.png',
-    title: 'Nhealth Care Rider & Medical Transit',
-    targetRoute: '/services?id=nhealth-care-ride',
-  },
+// Strict Hero Carousel Image Array matching local public/images/ assets
+export const heroImages = [
+  "/images/hero-1.png",
+  "/images/hero-2.png",
+  "/images/hero-3.png",
+  "/images/hero-4.png",
+  "/images/hero-5.png",
+  "/images/hero-6.png",
+  "/images/hero-7.png",
+  "/images/hero-8.png",
+  "/images/hero-9.png",
+  "/images/hero-10.png",
+  "/images/hero-11.png",
+  "/images/hero-12.png",
+  "/images/hero-13.png",
+  "/images/hero-14.png",
+  "/images/prebooking-opd-services-3x1.png",
+  "/images/premium-opd-services-3x1.png",
+  "/images/home-X-ray-Services-3x1.png",
+  "/images/online-doctor-consultations-3x1.png",
+  "/images/bedside-assistance-3x1.png",
+  "/images/eldercare-3x1.png",
+  "/images/doctor-home-visits-3x1.png",
+  "/images/Pharmacy-to-home-3x1.png",
+  "/images/labtest-at-home-3x1.png"
 ];
+
+export const MOBILE_HERO_SLIDES = heroImages.map((img, idx) => ({
+  id: `hero-${idx + 1}`,
+  directUrl: img,
+  title: `Healthcare Service ${idx + 1}`,
+  targetRoute: '/services',
+}));
 
 interface MobileHeroSplitCarouselProps {
   onServiceClick?: () => void;
@@ -103,11 +48,11 @@ export const MobileHeroSplitCarousel: React.FC<MobileHeroSplitCarouselProps> = (
   const touchStartX = useRef<number | null>(null);
 
   const nextSlide = useCallback(() => {
-    setCurrentIndex((prev) => (prev + 1) % MOBILE_HERO_SLIDES.length);
+    setCurrentIndex((prev) => (prev + 1) % heroImages.length);
   }, []);
 
   const prevSlide = useCallback(() => {
-    setCurrentIndex((prev) => (prev - 1 + MOBILE_HERO_SLIDES.length) % MOBILE_HERO_SLIDES.length);
+    setCurrentIndex((prev) => (prev - 1 + heroImages.length) % heroImages.length);
   }, []);
 
   // Automated cycling effect every 3.2 seconds
@@ -182,11 +127,11 @@ export const MobileHeroSplitCarousel: React.FC<MobileHeroSplitCarouselProps> = (
         className="w-[70%] h-full relative overflow-hidden bg-[#00172b] shrink-0 cursor-pointer"
         onClick={onServiceClick}
       >
-        {MOBILE_HERO_SLIDES.map((slide, idx) => {
+        {heroImages.map((imgSrc, idx) => {
           const isActive = idx === currentIndex;
           return (
             <div
-              key={slide.id}
+              key={`${imgSrc}-${idx}`}
               className={`absolute inset-0 w-full h-full transition-all duration-700 ease-in-out ${
                 isActive
                   ? 'opacity-100 scale-100 z-10'
@@ -194,8 +139,8 @@ export const MobileHeroSplitCarousel: React.FC<MobileHeroSplitCarouselProps> = (
               }`}
             >
               <img
-                src={slide.directUrl}
-                alt={slide.title}
+                src={imgSrc}
+                alt={`Healthcare Showcase ${idx + 1}`}
                 loading={idx === 0 ? 'eager' : 'lazy'}
                 className="w-full h-full object-cover object-center"
                 onError={(e) => {
@@ -217,7 +162,7 @@ export const MobileHeroSplitCarousel: React.FC<MobileHeroSplitCarouselProps> = (
           </span>
           <span className="text-[8px] text-white/50">/</span>
           <span className="text-[8px] text-white/60 tabular-nums">
-            {MOBILE_HERO_SLIDES.length}
+            {heroImages.length}
           </span>
         </div>
       </div>
