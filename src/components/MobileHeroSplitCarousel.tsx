@@ -20,15 +20,6 @@ export const heroImages = [
   "/images/hero-12.png",
   "/images/hero-13.png",
   "/images/hero-14.png",
-  "/images/prebooking-opd-services-3x1.png",
-  "/images/premium-opd-services-3x1.png",
-  "/images/home-X-ray-Services-3x1.png",
-  "/images/online-doctor-consultations-3x1.png",
-  "/images/bedside-assistance-3x1.png",
-  "/images/eldercare-3x1.png",
-  "/images/doctor-home-visits-3x1.png",
-  "/images/Pharmacy-to-home-3x1.png",
-  "/images/labtest-at-home-3x1.png"
 ];
 
 export const MOBILE_HERO_SLIDES = heroImages.map((img, idx) => ({
