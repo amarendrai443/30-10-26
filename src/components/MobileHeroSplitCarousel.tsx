@@ -16,6 +16,13 @@ export const mobileHero70Images = [
   "/images/eldercare-hero.png",
   "/images/labtest-at-home.png",
   "/images/doctor-home-visits.png",
+  "/images/hero-14s.png",
+  "/images/hero-2s.png",
+  "/images/hero-3s.png",
+  "/images/hero-4s.png",
+  "/images/hero-5s.png",
+  "/images/hero-6s.png",
+  "/images/hero-8s.png",
 ];
 
 export const heroImages = mobileHero70Images;
