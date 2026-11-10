@@ -23,6 +23,31 @@ export const ALL_SYSTEM_PERMISSIONS: SystemPermission[] = [
   { id: 'subadmin_control', label: 'Sub-Admin & User Role Management', category: 'Administration', description: 'Create and assign permissions to other staff members' },
 ];
 
+export interface RoleShiftEntry {
+  fromRole: string;
+  toRole: string;
+  shiftedAt: string;
+  shiftedBy: string;
+  reason?: string;
+}
+
+export interface StaffLoginLog {
+  id: string;
+  timestamp: string;
+  date: string;
+  time: string;
+  device?: string;
+}
+
+export interface StaffWorkRecord {
+  id: string;
+  date: string;
+  taskDescription: string;
+  hoursWorked: number;
+  status: 'Logged' | 'Reviewed' | 'Approved';
+  adminNotes?: string;
+}
+
 export interface StaffAccount {
   id: string;
   name: string;
@@ -30,7 +55,8 @@ export interface StaffAccount {
   phone: string;
   role: 'HR' | 'SubAdmin' | 'DoctorCoordinator' | 'OperationsLead' | 'FinanceExecutive' | 'CustomerSupport' | 'PartnerOnboarding';
   department: string;
-  status: 'Active' | 'Disabled';
+  status: 'Active' | 'Inactive' | 'Hold' | 'Disabled';
+  holdReason?: string;
   loginEnabled: boolean;
   permissions: string[];
   createdAt: string;
@@ -40,6 +66,11 @@ export interface StaffAccount {
   requestedBy?: string;
   requestedAt?: string;
   adminNotes?: string;
+  roleShiftHistory?: RoleShiftEntry[];
+  loginLogs?: StaffLoginLog[];
+  loginFrequency?: number;
+  totalActiveWorkMinutes?: number;
+  workRecords?: StaffWorkRecord[];
 }
 
 export const DEFAULT_STAFF_ACCOUNTS: StaffAccount[] = [
@@ -54,9 +85,20 @@ export const DEFAULT_STAFF_ACCOUNTS: StaffAccount[] = [
     loginEnabled: true,
     permissions: ['hr_portal', 'view_enquiries'],
     createdAt: '2026-01-15',
-    lastLogin: '2026-10-29 09:30 AM',
+    lastLogin: '2026-11-09 09:30 AM',
     notes: 'Head of People Operations. Access to clinician onboarding and HR portal.',
     approvalStatus: 'Approved',
+    loginFrequency: 42,
+    totalActiveWorkMinutes: 1840,
+    loginLogs: [
+      { id: 'log-1', timestamp: '2026-11-09 09:30 AM', date: '2026-11-09', time: '09:30 AM', device: 'Desktop Chrome / Workstation' },
+      { id: 'log-2', timestamp: '2026-11-08 08:55 AM', date: '2026-11-08', time: '08:55 AM', device: 'Desktop Chrome / Workstation' },
+      { id: 'log-3', timestamp: '2026-11-07 09:12 AM', date: '2026-11-07', time: '09:12 AM', device: 'Mobile Chrome / SOS Hotline' },
+    ],
+    workRecords: [
+      { id: 'wr-1', date: '2026-11-09', taskDescription: 'Conducted 4 clinician interviews and verified phlebotomy medical licenses', hoursWorked: 6.5, status: 'Approved', adminNotes: 'Verified against NABH checklist' },
+      { id: 'wr-2', date: '2026-11-08', taskDescription: 'Processed monthly payroll reconciliation and emergency shift compensations', hoursWorked: 7.0, status: 'Approved' },
+    ],
   },
   {
     id: 'staff-subadmin-01',
@@ -69,9 +111,19 @@ export const DEFAULT_STAFF_ACCOUNTS: StaffAccount[] = [
     loginEnabled: true,
     permissions: ['manage_partners', 'view_enquiries', 'manage_services', 'guest_bookings', 'vital_scans'],
     createdAt: '2026-02-01',
-    lastLogin: '2026-10-28 04:15 PM',
+    lastLogin: '2026-11-09 08:15 AM',
     notes: 'Senior Operations Sub-Admin overseeing phlebotomy dispatch & partner clinics.',
     approvalStatus: 'Approved',
+    loginFrequency: 68,
+    totalActiveWorkMinutes: 2950,
+    loginLogs: [
+      { id: 'log-4', timestamp: '2026-11-09 08:15 AM', date: '2026-11-09', time: '08:15 AM', device: 'Ops Console / Chrome' },
+      { id: 'log-5', timestamp: '2026-11-08 07:45 AM', date: '2026-11-08', time: '07:45 AM', device: 'Ops Console / Chrome' },
+    ],
+    workRecords: [
+      { id: 'wr-3', date: '2026-11-09', taskDescription: 'Dispatched 18 phlebotomy home visits with 99.4% on-time GPS SLA', hoursWorked: 8.0, status: 'Approved', adminNotes: 'Zero escalation day' },
+      { id: 'wr-4', date: '2026-11-08', taskDescription: 'Onboarded 2 new NABL diagnostic labs in South Hyderabad hub', hoursWorked: 7.5, status: 'Approved' },
+    ],
   },
   {
     id: 'staff-subadmin-02',
@@ -84,9 +136,17 @@ export const DEFAULT_STAFF_ACCOUNTS: StaffAccount[] = [
     loginEnabled: true,
     permissions: ['guest_bookings', 'vital_scans'],
     createdAt: '2026-03-10',
-    lastLogin: '2026-10-29 08:45 AM',
+    lastLogin: '2026-11-09 10:10 AM',
     notes: 'Physician scheduler and OPD home-visit coordinator.',
     approvalStatus: 'Approved',
+    loginFrequency: 31,
+    totalActiveWorkMinutes: 1320,
+    loginLogs: [
+      { id: 'log-6', timestamp: '2026-11-09 10:10 AM', date: '2026-11-09', time: '10:10 AM', device: 'iPad / Clinical Telehealth' },
+    ],
+    workRecords: [
+      { id: 'wr-5', date: '2026-11-09', taskDescription: 'Scheduled 14 home-visit doctor slots & 8 telemedicine escalations', hoursWorked: 6.0, status: 'Approved' },
+    ],
   },
   {
     id: 'staff-hr-02',
@@ -95,13 +155,16 @@ export const DEFAULT_STAFF_ACCOUNTS: StaffAccount[] = [
     phone: '+91 97000 44556',
     role: 'HR',
     department: 'Talent Acquisition & Compliance',
-    status: 'Active',
-    loginEnabled: true,
+    status: 'Hold',
+    holdReason: 'Annual compliance certificate renewal under administrative review.',
+    loginEnabled: false,
     permissions: ['hr_portal'],
     createdAt: '2026-04-12',
-    lastLogin: '2026-10-27 11:20 AM',
-    notes: 'Nurse and attendant background verification lead.',
+    lastLogin: '2026-11-05 11:20 AM',
+    notes: 'Account temporarily placed on administrative hold pending KYC refresh.',
     approvalStatus: 'Approved',
+    loginFrequency: 19,
+    totalActiveWorkMinutes: 890,
   },
   {
     id: 'staff-req-01',
@@ -126,12 +189,12 @@ export const DEFAULT_STAFF_ACCOUNTS: StaffAccount[] = [
     phone: '+91 98888 22331',
     role: 'CustomerSupport',
     department: 'Grievance & Support Desk',
-    status: 'Disabled',
+    status: 'Inactive',
     loginEnabled: false,
     permissions: ['view_enquiries'],
     createdAt: '2026-05-18',
     lastLogin: '2026-09-14 02:10 PM',
-    notes: 'Account temporarily suspended by Admin for security rotation.',
+    notes: 'Account deactivated during staff rotation.',
     approvalStatus: 'Approved',
   },
 ];
@@ -287,6 +350,203 @@ export function toggleStaffLoginAccess(id: string): boolean {
 export function deleteStaffAccount(id: string): void {
   const accounts = getStoredStaffAccounts();
   const updated = accounts.filter((acc) => acc.id !== id);
+  saveStoredStaffAccounts(updated);
+}
+
+/**
+ * Record a successful employee login with timestamp and frequency tracking
+ */
+export function recordStaffLogin(id: string, device = 'Web Browser'): StaffAccount | null {
+  const accounts = getStoredStaffAccounts();
+  let found: StaffAccount | null = null;
+  const now = new Date();
+  const timestamp = now.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+  const dateStr = now.toISOString().split('T')[0];
+  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  const updated = accounts.map((acc) => {
+    if (acc.id === id) {
+      const logs = acc.loginLogs || [];
+      const newLog: StaffLoginLog = {
+        id: `log-${Date.now()}`,
+        timestamp,
+        date: dateStr,
+        time: timeStr,
+        device,
+      };
+      const freq = (acc.loginFrequency || 0) + 1;
+      const updatedAccount: StaffAccount = {
+        ...acc,
+        lastLogin: timestamp,
+        loginFrequency: freq,
+        loginLogs: [newLog, ...logs].slice(0, 50),
+      };
+      found = updatedAccount;
+      return updatedAccount;
+    }
+    return acc;
+  });
+
+  if (found) {
+    saveStoredStaffAccounts(updated);
+  }
+  return found;
+}
+
+/**
+ * Log work duration for an employee session
+ */
+export function recordStaffWorkSession(id: string, additionalMinutes: number): void {
+  const accounts = getStoredStaffAccounts();
+  const updated = accounts.map((acc) => {
+    if (acc.id === id) {
+      return {
+        ...acc,
+        totalActiveWorkMinutes: (acc.totalActiveWorkMinutes || 0) + additionalMinutes,
+      };
+    }
+    return acc;
+  });
+  saveStoredStaffAccounts(updated);
+}
+
+/**
+ * Admin role shift control with audit trail
+ */
+export function shiftStaffRole(
+  id: string,
+  newRole: StaffAccount['role'],
+  adminName = 'Master Administrator',
+  reason?: string
+): StaffAccount | null {
+  const accounts = getStoredStaffAccounts();
+  let shifted: StaffAccount | null = null;
+  const now = new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+
+  const updated = accounts.map((acc) => {
+    if (acc.id === id) {
+      const history = acc.roleShiftHistory || [];
+      const entry: RoleShiftEntry = {
+        fromRole: acc.role,
+        toRole: newRole,
+        shiftedAt: now,
+        shiftedBy: adminName,
+        reason: reason || 'Operational restructuring by Administration',
+      };
+      shifted = {
+        ...acc,
+        role: newRole,
+        roleShiftHistory: [entry, ...history],
+        adminNotes: `Role shifted from ${acc.role} to ${newRole} on ${now} by ${adminName}.`,
+      };
+      return shifted;
+    }
+    return acc;
+  });
+
+  if (shifted) {
+    saveStoredStaffAccounts(updated);
+  }
+  return shifted;
+}
+
+/**
+ * Admin sets account status: Active, Inactive, Hold, Disabled
+ */
+export function setStaffAccountStatus(
+  id: string,
+  status: 'Active' | 'Inactive' | 'Hold' | 'Disabled',
+  holdReason?: string
+): StaffAccount | null {
+  const accounts = getStoredStaffAccounts();
+  let updatedAcc: StaffAccount | null = null;
+
+  const updated = accounts.map((acc) => {
+    if (acc.id === id) {
+      const isLoginOk = status === 'Active' && acc.approvalStatus === 'Approved';
+      updatedAcc = {
+        ...acc,
+        status,
+        loginEnabled: isLoginOk,
+        holdReason: status === 'Hold' ? holdReason || 'Account placed on Administrative Hold' : undefined,
+      };
+      return updatedAcc;
+    }
+    return acc;
+  });
+
+  if (updatedAcc) {
+    saveStoredStaffAccounts(updated);
+  }
+  return updatedAcc;
+}
+
+/**
+ * Full Admin view and edit privileges for work records
+ */
+export function addOrUpdateWorkRecord(
+  staffId: string,
+  record: {
+    id?: string;
+    date: string;
+    taskDescription: string;
+    hoursWorked: number;
+    status?: 'Logged' | 'Reviewed' | 'Approved';
+    adminNotes?: string;
+  }
+): void {
+  const accounts = getStoredStaffAccounts();
+  const updated = accounts.map((acc) => {
+    if (acc.id === staffId) {
+      const current = acc.workRecords || [];
+      const recordId = record.id || `wr-${Date.now()}`;
+      const existingIdx = current.findIndex((r) => r.id === recordId);
+      const newEntry: StaffWorkRecord = {
+        id: recordId,
+        date: record.date,
+        taskDescription: record.taskDescription,
+        hoursWorked: record.hoursWorked,
+        status: record.status || 'Approved',
+        adminNotes: record.adminNotes,
+      };
+
+      let newRecords: StaffWorkRecord[];
+      if (existingIdx >= 0) {
+        newRecords = [...current];
+        newRecords[existingIdx] = newEntry;
+      } else {
+        newRecords = [newEntry, ...current];
+      }
+
+      // Recalculate total work minutes
+      const totalMinutes = Math.round(newRecords.reduce((sum, r) => sum + (r.hoursWorked || 0) * 60, 0));
+
+      return {
+        ...acc,
+        workRecords: newRecords,
+        totalActiveWorkMinutes: totalMinutes,
+      };
+    }
+    return acc;
+  });
+  saveStoredStaffAccounts(updated);
+}
+
+export function deleteWorkRecord(staffId: string, recordId: string): void {
+  const accounts = getStoredStaffAccounts();
+  const updated = accounts.map((acc) => {
+    if (acc.id === staffId) {
+      const current = acc.workRecords || [];
+      const filtered = current.filter((r) => r.id !== recordId);
+      const totalMinutes = Math.round(filtered.reduce((sum, r) => sum + (r.hoursWorked || 0) * 60, 0));
+      return {
+        ...acc,
+        workRecords: filtered,
+        totalActiveWorkMinutes: totalMinutes,
+      };
+    }
+    return acc;
+  });
   saveStoredStaffAccounts(updated);
 }
 

@@ -32,6 +32,7 @@ import {
   Sparkles,
   ChevronRight,
   ShieldAlert,
+  Activity,
 } from 'lucide-react';
 import {
   StaffAccount,
@@ -183,7 +184,7 @@ export const HrPortalPage: React.FC<HrPortalPageProps> = ({ onNavigateHome, onNa
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Tab navigation inside HR
-  const [activeTab, setActiveTab] = useState<'employees' | 'leaves' | 'recruitment' | 'payroll' | 'credentials'>('employees');
+  const [activeTab, setActiveTab] = useState<'employees' | 'leaves' | 'recruitment' | 'payroll' | 'credentials' | 'activity'>('employees');
 
   // Search & filter
   const [searchTerm, setSearchTerm] = useState('');
@@ -690,6 +691,18 @@ export const HrPortalPage: React.FC<HrPortalPageProps> = ({ onNavigateHome, onNa
               </span>
             )}
           </button>
+
+          <button
+            onClick={() => setActiveTab('activity')}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === 'activity'
+                ? 'bg-teal-600 text-white shadow-lg shadow-teal-900/30'
+                : 'bg-slate-800/60 text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <Activity className="w-4 h-4" />
+            Work &amp; Activity Tracking
+          </button>
         </div>
 
         {/* Tab 1: Employee Directory */}
@@ -1046,6 +1059,93 @@ export const HrPortalPage: React.FC<HrPortalPageProps> = ({ onNavigateHome, onNa
                         </td>
                       </tr>
                     )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 6: Work & Login Activity Tracking */}
+        {activeTab === 'activity' && (
+          <div className="space-y-4">
+            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 backdrop-blur-md">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-teal-400" />
+                    <span>Employee Work Activity &amp; Login Audit Logs</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Real-time login timestamps, login frequency, and total active work duration logged across teams.
+                  </p>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto rounded-xl border border-slate-800">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-800/80 text-slate-400 font-semibold uppercase text-[10px] tracking-wider">
+                    <tr>
+                      <th className="px-4 py-3">Employee</th>
+                      <th className="px-4 py-3">Role &amp; Department</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Total Logins</th>
+                      <th className="px-4 py-3">Last Login Date &amp; Time</th>
+                      <th className="px-4 py-3">Active Work Duration</th>
+                      <th className="px-4 py-3">Recent Login Timestamp</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800 text-slate-300">
+                    {staffAccounts.map((acc) => {
+                      const hours = ((acc.totalActiveWorkMinutes || 0) / 60).toFixed(1);
+                      const latestLog = acc.loginLogs && acc.loginLogs.length > 0 ? acc.loginLogs[0] : null;
+
+                      return (
+                        <tr key={acc.id} className="hover:bg-slate-800/40 transition-colors">
+                          <td className="px-4 py-3">
+                            <div className="font-bold text-white">{acc.name}</div>
+                            <div className="text-[11px] text-teal-400">{acc.email}</div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="px-2 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/30 text-[10px] font-bold">
+                              {acc.role}
+                            </span>
+                            <div className="text-[11px] text-slate-400 mt-0.5">{acc.department}</div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              acc.status === 'Active'
+                                ? 'bg-emerald-500/20 text-emerald-300'
+                                : acc.status === 'Hold'
+                                ? 'bg-rose-500/20 text-rose-300'
+                                : 'bg-slate-700 text-slate-300'
+                            }`}>
+                              {acc.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 font-bold text-white">
+                            {acc.loginFrequency || 0} times
+                          </td>
+                          <td className="px-4 py-3 font-mono text-[11px] text-slate-300">
+                            {acc.lastLogin || 'No recorded login'}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="font-black text-teal-300">{hours} hrs</span>
+                            <span className="text-[10px] text-slate-500 block">({acc.totalActiveWorkMinutes || 0} mins)</span>
+                          </td>
+                          <td className="px-4 py-3 text-[11px] text-slate-400">
+                            {latestLog ? (
+                              <div>
+                                <span className="text-white font-medium">{latestLog.timestamp}</span>
+                                <span className="block text-[10px] text-slate-500">{latestLog.device || 'Nhealth Console'}</span>
+                              </div>
+                            ) : (
+                              'No recent log'
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

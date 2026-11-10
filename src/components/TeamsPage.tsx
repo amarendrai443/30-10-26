@@ -29,12 +29,14 @@ interface TeamsPageProps {
   onNavigateHome: () => void;
   onNavigatePartner?: () => void;
   onNavigateCorporate?: () => void;
+  onOpenLogin?: () => void;
 }
 
 export const TeamsPage: React.FC<TeamsPageProps> = ({
   onNavigateHome,
   onNavigatePartner,
   onNavigateCorporate,
+  onOpenLogin,
 }) => {
   // Official Nhealth Logo from https://ibb.co/SDYB7XbW
   const officialLogoUrl = 'https://i.ibb.co/wZG4rNV3/Nhealth-logo-8cm-x-8cm-high-quality-1-1.png';
@@ -282,6 +284,18 @@ export const TeamsPage: React.FC<TeamsPageProps> = ({
                 </button>
               )}
 
+              {onOpenLogin && (
+                <button
+                  type="button"
+                  onClick={onOpenLogin}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-bold text-[#002b49] bg-slate-100 hover:bg-teal-50 hover:text-[#008080] border border-slate-200/80 rounded-xl transition-all cursor-pointer shadow-2xs"
+                  title="Employee & Staff Workspace Login"
+                >
+                  <Lock className="w-4 h-4 text-teal-600" />
+                  <span>Employee Login</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() => setShowRoleModal(true)}
@@ -330,6 +344,23 @@ export const TeamsPage: React.FC<TeamsPageProps> = ({
                 <Briefcase className="w-4 h-4" />
                 <span>Join Our Team / Apply for Roles</span>
               </button>
+
+              {onOpenLogin && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    onOpenLogin();
+                  }}
+                  className="flex items-center justify-between w-full py-2.5 px-3.5 rounded-xl bg-slate-100 hover:bg-teal-50 border border-slate-200 text-[#002b49] text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                >
+                  <div className="flex items-center gap-2">
+                    <Lock className="w-4 h-4 text-teal-600" />
+                    <span>Employee Login &amp; Workspace</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                </button>
+              )}
 
               {onNavigateCorporate && (
                 <button

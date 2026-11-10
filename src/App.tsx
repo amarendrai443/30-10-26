@@ -83,6 +83,8 @@ import { HrPortalPage } from './components/HrPortalPage';
 import { PartnersPage } from './components/PartnersPage';
 import { ServicesListingPage } from './components/ServicesListingPage';
 import { FooterQuickLinksModal, QuickLinkType } from './components/FooterQuickLinksModal';
+import { EmployeeAuthModal } from './components/EmployeeAuthModal';
+import { StaffAccount } from './utils/staffAccessStorage';
 import { usePatientInactivityRefresh } from './hooks/usePatientInactivityRefresh';
 import {
   PartnerLogoItem,
@@ -1049,6 +1051,10 @@ export default function App() {
   const [appEmailOtpCode, setAppEmailOtpCode] = useState('');
   const [pendingQuickSignupUser, setPendingQuickSignupUser] = useState<{ user: UserAccount; identity: any } | null>(null);
 
+  // Employee & Staff Auth Modal State
+  const [employeeLoginModalOpen, setEmployeeLoginModalOpen] = useState(false);
+  const [employeeTimeoutNotice, setEmployeeTimeoutNotice] = useState<string | null>(null);
+
   const [partnerModalOpen, setPartnerModalOpen] = useState(false);
   const [partnerSubmitted, setPartnerSubmitted] = useState(false);
   const [partnerRefId, setPartnerRefId] = useState('');
@@ -1564,6 +1570,71 @@ export default function App() {
     setCurrentRoute('home');
   };
 
+  const handleEmployeeLoginSuccess = (account: StaffAccount, targetRoute: string) => {
+    const mappedUser: UserAccount = {
+      id: account.id,
+      name: account.name,
+      email: account.email,
+      phone: account.phone || '',
+      role: account.role as any,
+      accountType: 'Staff',
+      city: account.department || 'HQ',
+    };
+    setCurrentUser(mappedUser);
+    setIsLoggedIn(true);
+    try {
+      localStorage.setItem('nhealth_active_user', JSON.stringify(mappedUser));
+    } catch {}
+    setEmployeeLoginModalOpen(false);
+
+    if (targetRoute === '/hrthings') {
+      navigateTo('hrthings', '/hrthings');
+    } else if (targetRoute === '/command-center') {
+      navigateTo('command-center', '/command-center');
+    } else {
+      navigateTo('dashboard', '/dashboard');
+    }
+  };
+
+  // 30-Minute Inactivity Auto-Logout for Employee Workspace Sessions
+  useEffect(() => {
+    const isEmployeeActive =
+      (isLoggedIn && currentUser?.accountType === 'Staff') ||
+      currentRoute === 'hrthings' ||
+      currentRoute === 'command-center';
+
+    if (!isEmployeeActive) return;
+
+    const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes of no mouse/keyboard activity
+    let timeoutId: NodeJS.Timeout;
+
+    const performInactivityLogout = () => {
+      handleLogout();
+      try {
+        sessionStorage.removeItem('nhealth_hr_session_user');
+        sessionStorage.removeItem('nhealth_admin_authenticated');
+        localStorage.removeItem('nhealth_active_user');
+      } catch {}
+
+      setEmployeeTimeoutNotice('⏱️ Session Expired: You were automatically logged out due to 30 minutes of inactivity. Please re-authenticate.');
+      setEmployeeLoginModalOpen(true);
+    };
+
+    const resetTimer = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(performInactivityLogout, INACTIVITY_TIMEOUT_MS);
+    };
+
+    const events = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll', 'click'];
+    events.forEach((evt) => window.addEventListener(evt, resetTimer, { passive: true }));
+    resetTimer();
+
+    return () => {
+      clearTimeout(timeoutId);
+      events.forEach((evt) => window.removeEventListener(evt, resetTimer));
+    };
+  }, [isLoggedIn, currentUser, currentRoute]);
+
   const finalizeBooking = (
     data: BookingFormData | null,
     isGuest: boolean,
@@ -1881,11 +1952,23 @@ export default function App() {
 
   if (currentRoute === 'teams') {
     return (
-      <TeamsPage
-        onNavigateHome={navigateBack}
-        onNavigatePartner={() => navigateTo('partner-with-us', '/partner-with-us')}
-        onNavigateCorporate={() => navigateTo('corporate-enquiries', '/corporate-enquiries')}
-      />
+      <>
+        <TeamsPage
+          onNavigateHome={navigateBack}
+          onNavigatePartner={() => navigateTo('partner-with-us', '/partner-with-us')}
+          onNavigateCorporate={() => navigateTo('corporate-enquiries', '/corporate-enquiries')}
+          onOpenLogin={() => setEmployeeLoginModalOpen(true)}
+        />
+        <EmployeeAuthModal
+          isOpen={employeeLoginModalOpen}
+          onClose={() => {
+            setEmployeeLoginModalOpen(false);
+            setEmployeeTimeoutNotice(null);
+          }}
+          onLoginSuccess={handleEmployeeLoginSuccess}
+          timeoutNotice={employeeTimeoutNotice}
+        />
+      </>
     );
   }
 
@@ -2577,17 +2660,31 @@ export default function App() {
               >
                 About Us
               </button>
-              <button
-                type="button"
-                onClick={(e) =>
-                  handleMobileNav(e, () => {
-                    navigateTo('teams', '/teams');
-                  })
-                }
-                className="w-full text-left text-sm font-semibold text-slate-800 hover:text-[#008080] py-1.5 cursor-pointer"
-              >
-                Teams
-              </button>
+              <div className="flex items-center justify-between py-1.5 border-y border-slate-100 my-0.5">
+                <button
+                  type="button"
+                  onClick={(e) =>
+                    handleMobileNav(e, () => {
+                      navigateTo('teams', '/teams');
+                    })
+                  }
+                  className="text-sm font-semibold text-slate-800 hover:text-[#008080] cursor-pointer"
+                >
+                  Teams
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) =>
+                    handleMobileNav(e, () => {
+                      setEmployeeLoginModalOpen(true);
+                    })
+                  }
+                  className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-[#002b49] text-white hover:bg-[#008080] transition-colors shadow-2xs cursor-pointer active:scale-95"
+                >
+                  <Lock className="w-3.5 h-3.5 text-teal-400" />
+                  <span>Employee Login</span>
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={(e) =>
@@ -5600,6 +5697,17 @@ export default function App() {
         onVerifySuccess={handleAppEmailOtpSuccess}
         onResendOtp={handleResendAppEmailOtp}
         onClose={() => setAppEmailOtpModalOpen(false)}
+      />
+
+      {/* Employee & Staff Authentication & Approval Gate Modal */}
+      <EmployeeAuthModal
+        isOpen={employeeLoginModalOpen}
+        onClose={() => {
+          setEmployeeLoginModalOpen(false);
+          setEmployeeTimeoutNotice(null);
+        }}
+        onLoginSuccess={handleEmployeeLoginSuccess}
+        timeoutNotice={employeeTimeoutNotice}
       />
     </div>
   );
