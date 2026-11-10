@@ -3,10 +3,23 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
 
+const APP_VERSION = '1.0.1';
+
+const htmlVersionPlugin = () => ({
+  name: 'html-version-plugin',
+  apply: 'build' as const,
+  enforce: 'post' as const,
+  transformIndexHtml(html: string) {
+    return html
+      .replace(/(<script\b[^>]*\bsrc="\/assets\/[^"]+)(")/gi, `$1?v=${APP_VERSION}$2`)
+      .replace(/(<link\b[^>]*\bhref="\/assets\/[^"]+\.css)(")/gi, `$1?v=${APP_VERSION}$2`);
+  },
+});
+
 export default defineConfig(() => {
   return {
     appType: 'spa' as const,
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), htmlVersionPlugin()],
     resolve: {
       dedupe: ['react', 'react-dom'],
       alias: {

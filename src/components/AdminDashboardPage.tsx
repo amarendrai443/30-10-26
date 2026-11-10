@@ -63,7 +63,8 @@ import {
   Bell,
   Cpu,
   Server,
-  Webhook
+  Webhook,
+  Database
 } from 'lucide-react';
 
 import { PartnerApiWebhookSettings } from './PartnerApiWebhookSettings';
@@ -142,6 +143,8 @@ import { AdminPushNotificationsManager } from './AdminPushNotificationsManager';
 import { getStoredPushNotifications, PUSH_NOTIFICATIONS_UPDATED_EVENT } from '../utils/pushNotificationStorage';
 import { AdminSubAdminsManager } from './AdminSubAdminsManager';
 import { AdminEmployeeApprovalsManager } from './AdminEmployeeApprovalsManager';
+import { AdminDarTeamManager } from './AdminDarTeamManager';
+import { loadDarRecords } from '../utils/darTeamStorage';
 import { getStoredStaffAccounts } from '../utils/staffAccessStorage';
 
 interface AdminDashboardPageProps {
@@ -154,7 +157,7 @@ interface AdminDashboardPageProps {
   onNavigateOnboarding: () => void;
 }
 
-type AlignmentTab = 'All' | 'Pending' | 'Live' | 'Suspended' | 'HighRisk' | 'Enquiries' | 'VitalScans' | 'GuestBookings' | 'Advertising' | 'Testimonials' | 'PartnerLogos' | 'MarqueeServices' | 'Services' | 'Partners' | 'Accreditations' | 'PushNotifications' | 'PartnerApis' | 'AccessControl' | 'EmployeeApprovals';
+type AlignmentTab = 'All' | 'Pending' | 'Live' | 'Suspended' | 'HighRisk' | 'Enquiries' | 'VitalScans' | 'GuestBookings' | 'Advertising' | 'Testimonials' | 'PartnerLogos' | 'MarqueeServices' | 'Services' | 'Partners' | 'Accreditations' | 'PushNotifications' | 'PartnerApis' | 'AccessControl' | 'EmployeeApprovals' | 'DARTeamData';
 
 export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
   partners,
@@ -1954,6 +1957,40 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
               HR Roles &amp; Live Activation
             </span>
           </div>
+
+          {/* Card 17: Data Acquisition & Research Team (DAR Team Data & Google Sheets) */}
+          <div
+            onClick={() => setAlignmentTab('DARTeamData')}
+            className={`p-4 rounded-2xl border transition-all cursor-pointer shadow-2xs hover:shadow-md ${
+              alignmentTab === 'DARTeamData'
+                ? 'bg-teal-950 text-white border-teal-400 ring-2 ring-teal-400/40'
+                : 'bg-white border-slate-200 hover:border-teal-400'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className={`text-[11px] font-bold uppercase tracking-wider block ${
+                alignmentTab === 'DARTeamData' ? 'text-teal-300' : 'text-teal-950'
+              }`}>
+                DAR Team Data
+              </span>
+              <Database className={`w-4 h-4 ${alignmentTab === 'DARTeamData' ? 'text-teal-300' : 'text-teal-600'}`} />
+            </div>
+            <div className="flex items-baseline gap-1.5 mt-1">
+              <span className={`text-xl font-black ${
+                alignmentTab === 'DARTeamData' ? 'text-white' : 'text-teal-900'
+              }`}>
+                {loadDarRecords().length} Acquisitions
+              </span>
+              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                14 Wings
+              </span>
+            </div>
+            <span className={`text-[10.5px] font-medium mt-0.5 block truncate ${
+              alignmentTab === 'DARTeamData' ? 'text-slate-300' : 'text-slate-500'
+            }`}>
+              Google Sheets Master Sync
+            </span>
+          </div>
         </div>
 
         {/* ------------------------------------------------------------- */}
@@ -2348,11 +2385,32 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                   </span>
                 )}
               </button>
+
+              {/* Dedicated Tab: DAR Team Acquisitions & Google Sheets */}
+              <button
+                type="button"
+                onClick={() => setAlignmentTab('DARTeamData')}
+                className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5 ${
+                  alignmentTab === 'DARTeamData'
+                    ? 'bg-teal-700 text-white shadow-xs border border-teal-500'
+                    : 'bg-teal-50 hover:bg-teal-100 text-teal-950 border border-teal-200'
+                }`}
+              >
+                <Database className="w-3.5 h-3.5" />
+                <span>DAR Team Acquisitions</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full font-bold bg-teal-200 text-teal-900">
+                  {loadDarRecords().length}
+                </span>
+              </button>
             </div>
 
             {/* Quick Count Badge */}
             <div className="text-xs text-slate-500 font-medium">
-              {alignmentTab === 'EmployeeApprovals' ? (
+              {alignmentTab === 'DARTeamData' ? (
+                <span>
+                  DAR Master Registry: <strong>14 Healthcare Departments synced with connected Google Sheets</strong>
+                </span>
+              ) : alignmentTab === 'EmployeeApprovals' ? (
                 <span>
                   Admin Live Gate: <strong>Review HR Role Assignments &amp; Activate Employee Workspace Logins</strong>
                 </span>
@@ -2665,7 +2723,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
         </div>
 
         {/* ------------------------------------------------------------- */}
-        {alignmentTab === 'EmployeeApprovals' ? (
+        {alignmentTab === 'DARTeamData' ? (
+          <AdminDarTeamManager />
+        ) : alignmentTab === 'EmployeeApprovals' ? (
           <AdminEmployeeApprovalsManager />
         ) : alignmentTab === 'AccessControl' ? (
           <AdminSubAdminsManager />

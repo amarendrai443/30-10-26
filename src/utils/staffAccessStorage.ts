@@ -20,6 +20,7 @@ export const ALL_SYSTEM_PERMISSIONS: SystemPermission[] = [
   { id: 'marketing_ads', label: 'Promotions & Banner Ads', category: 'Marketing', description: 'Manage homepage banners, discounts, and carousel ads' },
   { id: 'push_notifications', label: 'Push Notification Engine', category: 'Marketing', description: 'Draft and blast push notifications to app users' },
   { id: 'api_webhooks', label: 'API Gateway & Webhook Hub', category: 'Administration', description: 'Manage confidential partner developer APIs and webhooks' },
+  { id: 'dar_portal', label: 'DAR Team Portal & Acquisitions', category: 'Operations', description: 'Data Acquisition & Research Team entry and Google Sheets sync' },
   { id: 'subadmin_control', label: 'Sub-Admin & User Role Management', category: 'Administration', description: 'Create and assign permissions to other staff members' },
 ];
 
@@ -53,7 +54,7 @@ export interface StaffAccount {
   name: string;
   email: string;
   phone: string;
-  role: 'HR' | 'SubAdmin' | 'DoctorCoordinator' | 'OperationsLead' | 'FinanceExecutive' | 'CustomerSupport' | 'PartnerOnboarding';
+  role: 'HR' | 'SubAdmin' | 'DoctorCoordinator' | 'OperationsLead' | 'FinanceExecutive' | 'CustomerSupport' | 'PartnerOnboarding' | 'DARTeam';
   department: string;
   status: 'Active' | 'Inactive' | 'Hold' | 'Disabled';
   holdReason?: string;
@@ -197,6 +198,30 @@ export const DEFAULT_STAFF_ACCOUNTS: StaffAccount[] = [
     notes: 'Account deactivated during staff rotation.',
     approvalStatus: 'Approved',
   },
+  {
+    id: 'staff-dar-01',
+    name: 'Ananya Deshmukh',
+    email: 'dar@nhealth.in',
+    phone: '+91 97654 32100',
+    role: 'DARTeam',
+    department: 'Data Acquisition & Research Team (DAR TEAM)',
+    status: 'Active',
+    loginEnabled: true,
+    permissions: ['dar_portal', 'manage_partners'],
+    createdAt: '2026-02-01',
+    lastLogin: '2026-11-10 10:00 AM',
+    notes: 'Senior Lead for Healthcare Vendor & Doctor Acquisition.',
+    approvalStatus: 'Approved',
+    loginFrequency: 28,
+    totalActiveWorkMinutes: 1250,
+    loginLogs: [
+      { id: 'dar-log-1', timestamp: '2026-11-10 10:00 AM', date: '2026-11-10', time: '10:00 AM', device: 'Desktop Chrome / DAR Workstation' },
+      { id: 'dar-log-2', timestamp: '2026-11-09 09:15 AM', date: '2026-11-09', time: '09:15 AM', device: 'Desktop Chrome / DAR Workstation' }
+    ],
+    workRecords: [
+      { id: 'dar-wr-1', date: '2026-11-10', taskDescription: 'Acquisition outreach for 14 specialty diagnostic imaging centers and labs in Bangalore South', hoursWorked: 6.0, status: 'Approved' }
+    ]
+  },
 ];
 
 const STORAGE_KEY = 'nhealth_staff_accounts';
@@ -210,7 +235,19 @@ export function getStoredStaffAccounts(): StaffAccount[] {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_STAFF_ACCOUNTS));
       return DEFAULT_STAFF_ACCOUNTS;
     }
-    return JSON.parse(raw);
+    const parsed: StaffAccount[] = JSON.parse(raw);
+    const existingIds = new Set(parsed.map((a) => a.id));
+    let hasNew = false;
+    DEFAULT_STAFF_ACCOUNTS.forEach((def) => {
+      if (!existingIds.has(def.id)) {
+        parsed.push(def);
+        hasNew = true;
+      }
+    });
+    if (hasNew) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+    }
+    return parsed;
   } catch (e) {
     console.error('Failed to parse staff accounts from storage:', e);
     return DEFAULT_STAFF_ACCOUNTS;

@@ -1339,9 +1339,15 @@ export const HrPortalPage: React.FC<HrPortalPageProps> = ({ onNavigateHome, onNa
                   <label className="block text-slate-300 font-semibold mb-1">Requested Team Role *</label>
                   <select
                     value={credForm.role}
-                    onChange={(e) => setCredForm({ ...credForm, role: e.target.value as StaffAccount['role'] })}
+                    onChange={(e) => {
+                      const r = e.target.value as StaffAccount['role'];
+                      let dept = credForm.department;
+                      if (r === 'DARTeam') dept = 'Data Acquisition & Research Team (DAR TEAM)';
+                      setCredForm({ ...credForm, role: r, department: dept });
+                    }}
                     className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-white"
                   >
+                    <option value="DARTeam">Data Acquisition &amp; Research Team (DAR TEAM)</option>
                     <option value="CustomerSupport">Support Staff (SOS / Helpdesk)</option>
                     <option value="OperationsLead">Operations &amp; Fleet Coordinator</option>
                     <option value="PartnerOnboarding">Partner Onboarding &amp; Audit</option>

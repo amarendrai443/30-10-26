@@ -150,7 +150,9 @@ export const EmployeeAuthModal: React.FC<EmployeeAuthModalProps> = ({
     
     // Determine Target Workspace
     let target = '/dashboard';
-    if (trackedAccount.role === 'HR' || trackedAccount.permissions.includes('hr_portal')) {
+    if (trackedAccount.role === 'DARTeam' || trackedAccount.permissions.includes('dar_portal')) {
+      target = '/dar-team';
+    } else if (trackedAccount.role === 'HR' || trackedAccount.permissions.includes('hr_portal')) {
       target = '/hrthings';
     } else if (trackedAccount.role === 'SubAdmin' || trackedAccount.role === 'OperationsLead') {
       target = '/command-center';
@@ -171,7 +173,9 @@ export const EmployeeAuthModal: React.FC<EmployeeAuthModalProps> = ({
         role: regRole,
         department: regDepartment.trim(),
         notes: regNotes.trim(),
-        suggestedPermissions: regRole === 'HR' 
+        suggestedPermissions: regRole === 'DARTeam'
+          ? ['dar_portal', 'manage_partners']
+          : regRole === 'HR' 
           ? ['hr_portal', 'view_enquiries'] 
           : regRole === 'SubAdmin' 
           ? ['manage_partners', 'view_enquiries', 'guest_bookings']
@@ -482,6 +486,18 @@ export const EmployeeAuthModal: React.FC<EmployeeAuthModalProps> = ({
                       <div className="font-bold text-amber-300">Harish Varma (Pending Gate)</div>
                       <div className="text-[10px] text-amber-200/80">harish.support@nhealth.in • Waiting Admin Approval</div>
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={() => { setLoginEmail('dar@nhealth.in'); setLoginPassword('dar123'); }}
+                      className="p-2 rounded-xl bg-teal-950/50 border border-teal-500/60 hover:border-teal-400 text-left cursor-pointer transition-colors sm:col-span-2"
+                    >
+                      <div className="font-bold text-teal-300 flex items-center justify-between">
+                        <span>Ananya Deshmukh (DAR Team Lead)</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-200 border border-teal-400/30">DAR WORKSPACE</span>
+                      </div>
+                      <div className="text-[10px] text-teal-200/80">dar@nhealth.in • Data Acquisition &amp; Research Team Dashboard</div>
+                    </button>
                   </div>
                 </div>
               </form>
@@ -604,11 +620,13 @@ export const EmployeeAuthModal: React.FC<EmployeeAuthModalProps> = ({
                         if (r === 'CustomerSupport') setRegDepartment('24/7 Patient Helpdesk & SOS');
                         if (r === 'FinanceExecutive') setRegDepartment('Billing & Claims Processing');
                         if (r === 'PartnerOnboarding') setRegDepartment('Provider Network & Hospital Relations');
+                        if (r === 'DARTeam') setRegDepartment('Data Acquisition & Research Team (DAR TEAM)');
                         if (r === 'HR') setRegDepartment('Human Resources & Talent Management');
                         if (r === 'SubAdmin') setRegDepartment('System Operations Command');
                       }}
                       className="w-full px-3 py-2 rounded-xl bg-[#00223f] border border-slate-700 text-white text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"
                     >
+                      <option value="DARTeam">Data Acquisition &amp; Research Team (DAR TEAM)</option>
                       <option value="DoctorCoordinator">Doctor / Clinical Coordinator</option>
                       <option value="OperationsLead">Operations &amp; Fleet Lead</option>
                       <option value="CustomerSupport">Patient Grievance &amp; Support</option>

@@ -905,6 +905,7 @@ export const AdminEmployeeApprovalsManager: React.FC = () => {
                 onChange={(e) => setTargetRole(e.target.value as StaffAccount['role'])}
                 className="w-full p-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-teal-500"
               >
+                <option value="DARTeam">Data Acquisition &amp; Research Team (DAR TEAM)</option>
                 <option value="DoctorCoordinator">Doctor / Clinical Coordinator</option>
                 <option value="OperationsLead">Operations &amp; Fleet Lead</option>
                 <option value="CustomerSupport">Customer Support &amp; Grievance</option>
@@ -1430,11 +1431,13 @@ export const AdminEmployeeApprovalsManager: React.FC = () => {
                       if (r === 'DoctorCoordinator') setNewDepartment('Clinical Operations & Telehealth');
                       if (r === 'OperationsLead') setNewDepartment('Field Logistics & Fleet');
                       if (r === 'CustomerSupport') setNewDepartment('24/7 Patient Grievance & SOS');
+                      if (r === 'DARTeam') setNewDepartment('Data Acquisition & Research Team (DAR TEAM)');
                       if (r === 'HR') setNewDepartment('Human Resources & Talent Management');
                       if (r === 'SubAdmin') setNewDepartment('Regional System Operations');
                     }}
                     className="w-full p-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-teal-500"
                   >
+                    <option value="DARTeam">Data Acquisition &amp; Research Team (DAR TEAM)</option>
                     <option value="DoctorCoordinator">Doctor / Clinical Coordinator</option>
                     <option value="OperationsLead">Operations &amp; Fleet Lead</option>
                     <option value="CustomerSupport">Customer Support &amp; Grievance</option>

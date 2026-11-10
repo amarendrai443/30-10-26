@@ -80,6 +80,7 @@ import { PartnerApiGatewayPortal } from './components/PartnerApiGatewayPortal';
 import { TestimonialsCarousel } from './components/TestimonialsCarousel';
 import { PatientFeedbackModal } from './components/PatientFeedbackModal';
 import { HrPortalPage } from './components/HrPortalPage';
+import { DarTeamDashboard } from './components/DarTeamDashboard';
 import { PartnersPage } from './components/PartnersPage';
 import { ServicesListingPage } from './components/ServicesListingPage';
 import { FooterQuickLinksModal, QuickLinkType } from './components/FooterQuickLinksModal';
@@ -287,6 +288,7 @@ type RoutePath =
   | 'insurer'
   | 'api-gateway'
   | 'hrthings'
+  | 'dar-team'
   | DedicatedServiceKey;
 
 export const VALID_ROUTES: RoutePath[] = [
@@ -305,6 +307,7 @@ export const VALID_ROUTES: RoutePath[] = [
   'insurer',
   'api-gateway',
   'hrthings',
+  'dar-team',
   'doctor-home-visits',
   'home-diagnostics',
   'xray-portable-diagnostics',
@@ -381,6 +384,7 @@ export function normalizeRoute(raw: string | null | undefined): RoutePath | null
   if (clean === 'insurer' || clean === 'insurer-portal' || clean === 'insurer-panel' || clean === 'insurance-partner') return 'insurer';
   if (clean === 'api-gateway' || clean === 'api' || clean === 'developer-api' || clean === 'api-docs' || clean === 'docs') return 'api-gateway';
   if (clean === 'hrthings' || clean === 'hr' || clean === 'hr-portal' || clean === 'hrportal') return 'hrthings';
+  if (clean === 'dar-team' || clean === 'dar' || clean === 'darteam' || clean === 'dar_team' || clean === 'dar-dashboard') return 'dar-team';
   
   const dedicated = getServiceDedicatedRoute(clean);
   if (dedicated) return dedicated;
@@ -1587,7 +1591,9 @@ export default function App() {
     } catch {}
     setEmployeeLoginModalOpen(false);
 
-    if (targetRoute === '/hrthings') {
+    if (targetRoute === '/dar-team' || (account.role as string) === 'DARTeam') {
+      navigateTo('dar-team', '/dar-team');
+    } else if (targetRoute === '/hrthings') {
       navigateTo('hrthings', '/hrthings');
     } else if (targetRoute === '/command-center') {
       navigateTo('command-center', '/command-center');
@@ -1601,7 +1607,8 @@ export default function App() {
     const isEmployeeActive =
       (isLoggedIn && currentUser?.accountType === 'Staff') ||
       currentRoute === 'hrthings' ||
-      currentRoute === 'command-center';
+      currentRoute === 'command-center' ||
+      currentRoute === 'dar-team';
 
     if (!isEmployeeActive) return;
 
@@ -1977,6 +1984,16 @@ export default function App() {
       <HrPortalPage
         onNavigateHome={navigateBack}
         onNavigateAdmin={() => navigateTo('command-center', '/command-center')}
+      />
+    );
+  }
+
+  if (currentRoute === 'dar-team') {
+    return (
+      <DarTeamDashboard
+        currentUser={currentUser as any}
+        onLogout={handleLogout}
+        onNavigateHome={() => navigateTo('home', '/')}
       />
     );
   }
