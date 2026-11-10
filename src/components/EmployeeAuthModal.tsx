@@ -453,7 +453,7 @@ export const EmployeeAuthModal: React.FC<EmployeeAuthModalProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                     <button
                       type="button"
-                      onClick={() => { setLoginEmail('hr@nhealth.in'); setLoginPassword('hr123'); }}
+                      onClick={() => { setLoginEmail('hr@nhealth.in'); setLoginError(null); }}
                       className="p-2 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-teal-500/40 text-left cursor-pointer transition-colors"
                     >
                       <div className="font-bold text-teal-300">Priya Sharma (HR Lead)</div>
@@ -462,7 +462,7 @@ export const EmployeeAuthModal: React.FC<EmployeeAuthModalProps> = ({
 
                     <button
                       type="button"
-                      onClick={() => { setLoginEmail('vikram.ops@nhealth.in'); setLoginPassword('admin123'); }}
+                      onClick={() => { setLoginEmail('vikram.ops@nhealth.in'); setLoginError(null); }}
                       className="p-2 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-teal-500/40 text-left cursor-pointer transition-colors"
                     >
                       <div className="font-bold text-teal-300">Vikram Rao (Sub-Admin Ops)</div>
@@ -471,7 +471,7 @@ export const EmployeeAuthModal: React.FC<EmployeeAuthModalProps> = ({
 
                     <button
                       type="button"
-                      onClick={() => { setLoginEmail('ananya.clinical@nhealth.in'); setLoginPassword('clin123'); }}
+                      onClick={() => { setLoginEmail('ananya.clinical@nhealth.in'); setLoginError(null); }}
                       className="p-2 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-teal-500/40 text-left cursor-pointer transition-colors"
                     >
                       <div className="font-bold text-teal-300">Ananya Reddy (Doctor Coord)</div>
@@ -480,7 +480,7 @@ export const EmployeeAuthModal: React.FC<EmployeeAuthModalProps> = ({
 
                     <button
                       type="button"
-                      onClick={() => { setLoginEmail('harish.support@nhealth.in'); setLoginPassword('help123'); }}
+                      onClick={() => { setLoginEmail('harish.support@nhealth.in'); setLoginError(null); }}
                       className="p-2 rounded-xl bg-amber-950/40 border border-amber-500/40 hover:border-amber-400 text-left cursor-pointer transition-colors"
                     >
                       <div className="font-bold text-amber-300">Harish Varma (Pending Gate)</div>
@@ -489,7 +489,7 @@ export const EmployeeAuthModal: React.FC<EmployeeAuthModalProps> = ({
 
                     <button
                       type="button"
-                      onClick={() => { setLoginEmail('dar@nhealth.in'); setLoginPassword('dar123'); }}
+                      onClick={() => { setLoginEmail('dar@nhealth.in'); setLoginError(null); }}
                       className="p-2 rounded-xl bg-teal-950/50 border border-teal-500/60 hover:border-teal-400 text-left cursor-pointer transition-colors sm:col-span-2"
                     >
                       <div className="font-bold text-teal-300 flex items-center justify-between">
