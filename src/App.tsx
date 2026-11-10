@@ -395,64 +395,32 @@ export function normalizeRoute(raw: string | null | undefined): RoutePath | null
 export function getRouteFromLocation(): RoutePath {
   if (typeof window === 'undefined') return 'home';
 
-  // 1. Check logged in user account type: block landing/hero page when logged in
-  try {
-    const savedUser = localStorage.getItem('nhealth_user');
-    if (savedUser) {
-      const user = JSON.parse(savedUser);
-      const isPatient = user?.role === 'Patient' || user?.accountType === 'Patient';
-      const defaultDashboard: RoutePath = isPatient ? 'patient-dashboard' : 'dashboard';
+  const pathname = window.location.pathname || '';
+  const hash = window.location.hash || '';
 
-      const fromHash = window.location.hash ? normalizeRoute(window.location.hash) : null;
-      const fromPath = window.location.pathname && window.location.pathname !== '/'
-        ? normalizeRoute(window.location.pathname)
-        : null;
-
-      // Allow access to dedicated sub-pages during active session (services, teams, partner-with-us, etc.)
-      if (fromHash && fromHash !== 'home' && fromHash !== 'auth') {
-        return fromHash;
-      }
-      if (fromPath && fromPath !== 'home' && fromPath !== 'auth') {
-        return fromPath;
-      }
-
-      // POST-LOGIN HERO RESTRICTION: Never allow redirect to hero/landing page while authenticated
-      return defaultDashboard;
-    }
-  } catch {}
-
-  // 2. Unauthenticated check: block entering authenticated dashboards without fresh login
-  const rawTarget = window.location.hash
-    ? normalizeRoute(window.location.hash)
-    : (window.location.pathname !== '/' ? normalizeRoute(window.location.pathname) : null);
-  if (rawTarget === 'patient-dashboard' || rawTarget === 'dashboard') {
+  // 1. Explicit Root Path Check: Visiting "/" or "" or "/index.html" with no sub-route MUST ALWAYS open the Landing / Hero Page by default
+  const isRoot = (!pathname || pathname === '/' || pathname === '/index.html') && (!hash || hash === '#' || hash === '#/' || hash === '#home');
+  if (isRoot) {
     return 'home';
   }
 
-  // 3. Check window.location.hash (e.g. #/teams, #services)
-  if (window.location.hash) {
-    const fromHash = normalizeRoute(window.location.hash);
+  // 2. Check window.location.hash (e.g. #/teams, #teams, #services)
+  if (hash) {
+    const fromHash = normalizeRoute(hash);
     if (fromHash && fromHash !== 'patient-dashboard' && fromHash !== 'dashboard') return fromHash;
   }
 
-  // 4. Check window.location.pathname (e.g. /teams, /services)
-  if (window.location.pathname && window.location.pathname !== '/') {
-    const fromPath = normalizeRoute(window.location.pathname);
+  // 3. Check window.location.pathname (e.g. /teams, /services)
+  if (pathname && pathname !== '/' && pathname !== '/index.html') {
+    const fromPath = normalizeRoute(pathname);
     if (fromPath && fromPath !== 'patient-dashboard' && fromPath !== 'dashboard') return fromPath;
   }
 
-  // 5. Check URL query parameters (e.g. ?p=services or ?route=...)
+  // 4. Check URL query parameters (e.g. ?p=teams or ?route=...)
   try {
     const params = new URLSearchParams(window.location.search);
     const qRoute = normalizeRoute(params.get('route') || params.get('p') || params.get('page'));
     if (qRoute && qRoute !== 'patient-dashboard' && qRoute !== 'dashboard') return qRoute;
-  } catch {}
-
-  // 6. Check localStorage for persisted active route (if not protected dashboard)
-  try {
-    const savedLocal = localStorage.getItem('nhealth_active_route');
-    const validLocal = normalizeRoute(savedLocal);
-    if (validLocal && validLocal !== 'patient-dashboard' && validLocal !== 'dashboard') return validLocal;
   } catch {}
 
   return 'home';
@@ -1961,7 +1929,7 @@ export default function App() {
     return (
       <>
         <TeamsPage
-          onNavigateHome={navigateBack}
+          onNavigateHome={() => navigateTo('home', '/')}
           onNavigatePartner={() => navigateTo('partner-with-us', '/partner-with-us')}
           onNavigateCorporate={() => navigateTo('corporate-enquiries', '/corporate-enquiries')}
           onOpenLogin={() => setEmployeeLoginModalOpen(true)}
@@ -5369,10 +5337,10 @@ export default function App() {
                 </li>
                 <li>
                   <a
-                    href="#teams"
+                    href="/teams"
                     onClick={(e) => {
                       e.preventDefault();
-                      navigateTo('teams', '#teams');
+                      navigateTo('teams', '/teams');
                     }}
                     className="hover:text-white transition-colors text-left cursor-pointer inline-block"
                   >

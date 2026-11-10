@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Users,
   ShieldCheck,
@@ -21,9 +21,12 @@ import {
   Lock,
   Globe2,
   Award,
-  Menu
+  Menu,
+  RefreshCw
 } from 'lucide-react';
 import { addEnquiry } from '../types/enquiry';
+import { fetchTeamData, getStoredTeamData } from '../utils/teamStorage';
+import { TeamPillar, TeamMetrics } from '../types/team';
 
 interface TeamsPageProps {
   onNavigateHome: () => void;
@@ -91,95 +94,35 @@ export const TeamsPage: React.FC<TeamsPageProps> = ({
     }, 2500);
   };
 
-  const pillars = [
-    {
-      id: 'clinical',
-      key: 'clinical' as const,
-      name: 'Clinical Ops',
-      fullName: 'Clinical Operations & Medical Quality Governance',
-      tagline: 'NABH-Standard Care Protocols & Patient Safety',
-      icon: Stethoscope,
-      accentColor: 'from-[#008080] to-emerald-600',
-      badgeColor: 'bg-teal-50 text-teal-800 border-teal-200',
-      stats: [
-        { label: 'Verified Specialists', value: '250+' },
-        { label: 'Protocol Adherence', value: '99.8%' },
-        { label: 'Emergency Triage Benchmark', value: '< 15 mins' },
-      ],
-      description:
-        'Our Clinical Operations command team bridges bedside medicine, hospital emergency wards, tele-triage consultations, and home-care patient interventions with uncompromising safety benchmarks and clinical governance.',
-      coreResponsibilities: [
-        'Rigorous doctor, nurse, and allied medical personnel credentialing & background verification',
-        'NABH-aligned clinical standard operating procedures (SOPs) for acute and chronic home care',
-        '24/7 tele-triage escalation matrix and hospital tertiary care transfer protocols',
-        'Continuous clinical mortality and morbidity audits, feedback reviews, and pharmacovigilance',
-      ],
-      disciplines: [
-        'Emergency Medicine Specialists',
-        'Critical Care Physicians & MD Internists',
-        'Certified Home ICU Nursing Leads',
-        'Clinical Quality & NABH Auditors',
-      ],
-    },
-    {
-      id: 'tech',
-      key: 'tech' as const,
-      name: 'Tech & Product',
-      fullName: 'Technology, AI & Digital Health Products',
-      tagline: 'High-Availability Architectures & Contactless AI Diagnostics',
-      icon: Code2,
-      accentColor: 'from-[#002b49] to-cyan-700',
-      badgeColor: 'bg-blue-50 text-[#002b49] border-blue-200',
-      stats: [
-        { label: 'Platform Availability', value: '99.99%' },
-        { label: 'API Response Latency', value: '< 50 ms' },
-        { label: 'Data Encryption Standard', value: 'AES-256' },
-      ],
-      description:
-        'The Tech & Product division engineers the backbone of Nhealth: high-performance teleconsultation pipelines, VitalLens AI contactless vitals screening, real-time GPS ambulance telemetry, and ABDM-compliant health record interoperability.',
-      coreResponsibilities: [
-        'VitalLens AI engine for contactless biometric extraction (Pulse, HRV, Respiration, Stress) via standard cameras',
-        'ABDM (Ayushman Bharat Digital Mission) FHIR health record pipelines with strict data privacy',
-        'Zero-trust microservices architecture with role-based access controls and end-to-end encryption',
-        'Real-time dispatch coordination engine for ambulances, home nurses, and diagnostic phlebotomists',
-      ],
-      disciplines: [
-        'Distributed Systems & Cloud Architects',
-        'Computer Vision & Bio-Signal AI Engineers',
-        'Full-Stack Frontend & Mobile Developers',
-        'Cybersecurity & HIPAA/ABDM Compliance Officers',
-      ],
-    },
-    {
-      id: 'network',
-      key: 'network' as const,
-      name: 'Network Expansion',
-      fullName: 'Provider Alliances, Hospital & City Growth',
-      tagline: 'Hyperlocal Provider Grid & Institutional Alliances',
-      icon: Network,
-      accentColor: 'from-[#003e6b] to-[#008080]',
-      badgeColor: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-      stats: [
-        { label: 'Provider Nodes', value: '500+' },
-        { label: 'Operational Hubs', value: '18+ Cities' },
-        { label: 'Home Delivery Radius', value: '15 Mins' },
-      ],
-      description:
-        'The Network Expansion team builds the physical fabric of Nhealth by onboarding certified diagnostic labs, licensed retail pharmacies, premier hospital emergency networks, and corporate enterprise clients nationwide.',
-      coreResponsibilities: [
-        'Strategic alliances with tertiary and quaternary multi-specialty hospital chains for cashless beds & emergency admissions',
-        'Hyperlocal integration with NABL-accredited diagnostic labs for 60-minute doorstep sample collection',
-        'Last-mile fulfillment network for verified pharmacy delivery and home medical equipment supply',
-        'Enterprise healthcare and occupational wellness deployments for corporate campuses and industrial hubs',
-      ],
-      disciplines: [
-        'Hospital & Institutional Alliance Leads',
-        'Diagnostic Laboratory Network Managers',
-        'Hyperlocal Operations & Logistics Directors',
-        'Enterprise Corporate Wellness Consultants',
-      ],
-    },
-  ];
+  const [pillars, setPillars] = useState<TeamPillar[]>(() => getStoredTeamData().pillars);
+  const [metrics, setMetrics] = useState<TeamMetrics>(() => getStoredTeamData().metrics);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetchTeamData().then((data) => {
+      if (isMounted && data) {
+        setPillars(data.pillars);
+        setMetrics(data.metrics);
+        setIsLoading(false);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const getPillarIcon = (iconName: string) => {
+    switch (iconName) {
+      case 'Code2':
+        return Code2;
+      case 'Network':
+        return Network;
+      case 'Stethoscope':
+      default:
+        return Stethoscope;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans selection:bg-teal-500 selection:text-white">
@@ -549,17 +492,17 @@ export const TeamsPage: React.FC<TeamsPageProps> = ({
 
                     <div className="mt-6 w-full pt-4 border-t border-slate-100 flex items-center justify-around text-center">
                       <div>
-                        <div className="text-base sm:text-lg font-bold text-[#002b49]">250+</div>
+                        <div className="text-base sm:text-lg font-bold text-[#002b49]">{metrics?.cliniciansCount || '250+'}</div>
                         <div className="text-[11px] text-slate-500 font-medium">Clinicians</div>
                       </div>
                       <div className="h-6 w-px bg-slate-200" />
                       <div>
-                        <div className="text-base sm:text-lg font-bold text-teal-700">40+</div>
+                        <div className="text-base sm:text-lg font-bold text-teal-700">{metrics?.engineersCount || '40+'}</div>
                         <div className="text-[11px] text-slate-500 font-medium">Engineers</div>
                       </div>
                       <div className="h-6 w-px bg-slate-200" />
                       <div>
-                        <div className="text-base sm:text-lg font-bold text-[#003e6b]">18+</div>
+                        <div className="text-base sm:text-lg font-bold text-[#003e6b]">{metrics?.citiesActive || '18+'}</div>
                         <div className="text-[11px] text-slate-500 font-medium">Cities Active</div>
                       </div>
                     </div>
@@ -697,7 +640,7 @@ export const TeamsPage: React.FC<TeamsPageProps> = ({
               {/* Pillar Selector Tabs */}
               <div className="inline-flex p-1 bg-white rounded-2xl border border-slate-200 shadow-xs">
                 {pillars.map((pillar) => {
-                  const Icon = pillar.icon;
+                  const Icon = getPillarIcon(pillar.iconName);
                   const isSelected = activePillar === pillar.key;
                   return (
                     <button
@@ -722,7 +665,7 @@ export const TeamsPage: React.FC<TeamsPageProps> = ({
             {pillars
               .filter((p) => p.key === activePillar)
               .map((pillar) => {
-                const Icon = pillar.icon;
+                const Icon = getPillarIcon(pillar.iconName);
                 return (
                   <div
                     key={pillar.id}
