@@ -95,8 +95,10 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
   const [liveBpm, setLiveBpm] = useState<number>(72);
   const [isFaceDetected, setIsFaceDetected] = useState(true);
   const [faceAlignmentWarning, setFaceAlignmentWarning] = useState<string | null>(null);
+  const [lightingWarning, setLightingWarning] = useState<string | null>(null);
+  const [motionWarning, setMotionWarning] = useState<string | null>(null);
 
-  // MediaPipe Face Mesh Detection Refs
+  // MediaPipe Face Mesh Detection & Environmental Guardrail Refs
   const faceMeshRef = useRef<any>(null);
   const isFaceMeshReadyRef = useRef<boolean>(false);
   const faceMeshProcessingRef = useRef<boolean>(false);
@@ -104,6 +106,17 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
   const isFaceDetectedRef = useRef<boolean>(true);
   const isFaceAlignedRef = useRef<boolean>(true);
   const faceAlignmentWarningRef = useRef<string | null>(null);
+  const lightingWarningRef = useRef<string | null>(null);
+  const motionWarningRef = useRef<string | null>(null);
+  const badLightingFramesRef = useRef<number>(0);
+  const prevMotionSampleRef = useRef<{
+    time: number;
+    eyeDist: number;
+    pts: Array<{ x: number; y: number }>;
+    mouthGapRatio: number;
+  } | null>(null);
+  const mouthActivityWindowRef = useRef<number[]>([]);
+  const motionHoldUntilRef = useRef<number>(0);
   const lastFaceMeshInferTimeRef = useRef<number>(0);
   const lastWaveformDrawTimeRef = useRef<number>(0);
   const offscreenFaceCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -268,14 +281,82 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
 
           const validation = validateFaceLandmarks(rawLandmarks);
 
-          if (rawLandmarks) {
+          if (rawLandmarks && rawLandmarks.length >= 468) {
             latestFaceLandmarksRef.current = rawLandmarks;
             if (!isFaceDetectedRef.current) {
               isFaceDetectedRef.current = true;
               setIsFaceDetected(true);
             }
+
+            // Head Motion & Talking Detection across consecutive frames
+            const nowMs = performance.now();
+            const lEye = rawLandmarks[33];
+            const rEye = rawLandmarks[263];
+            const nosePt = rawLandmarks[1];
+            const foreheadPt = rawLandmarks[10];
+            const upperLip = rawLandmarks[13];
+            const lowerLip = rawLandmarks[14];
+            const eyeDist = Math.max(0.05, Math.hypot(rEye.x - lEye.x, rEye.y - lEye.y));
+            const mouthGapRatio = Math.abs(lowerLip.y - upperLip.y) / eyeDist;
+            const trackedPts = [
+              { x: nosePt.x, y: nosePt.y },
+              { x: foreheadPt.x, y: foreheadPt.y },
+              { x: lEye.x, y: lEye.y },
+              { x: rEye.x, y: rEye.y },
+            ];
+
+            if (prevMotionSampleRef.current) {
+              const dtSec = Math.max(0.016, (nowMs - prevMotionSampleRef.current.time) / 1000);
+              let dispSum = 0;
+              for (let k = 0; k < trackedPts.length; k++) {
+                const dx = trackedPts[k].x - prevMotionSampleRef.current.pts[k].x;
+                const dy = trackedPts[k].y - prevMotionSampleRef.current.pts[k].y;
+                dispSum += Math.hypot(dx, dy) / eyeDist;
+              }
+              const avgNormDisp = dispSum / trackedPts.length;
+              const headVelocity = avgNormDisp / dtSec; // eye-widths per second
+              const mouthDelta = Math.abs(mouthGapRatio - prevMotionSampleRef.current.mouthGapRatio);
+
+              mouthActivityWindowRef.current.push(mouthDelta);
+              if (mouthActivityWindowRef.current.length > 15) {
+                mouthActivityWindowRef.current.shift();
+              }
+              const avgMouthActivity =
+                mouthActivityWindowRef.current.reduce((s, v) => s + v, 0) /
+                Math.max(1, mouthActivityWindowRef.current.length);
+
+              const isFastHeadMove = avgNormDisp > 0.032 || headVelocity > 0.55;
+              const isExcessiveTalking = avgMouthActivity > 0.022 || mouthDelta > 0.05;
+
+              if (isFastHeadMove || isExcessiveTalking) {
+                motionHoldUntilRef.current = nowMs + 950;
+                const warnMsg = isExcessiveTalking && !isFastHeadMove
+                  ? 'Hold still — Avoid talking during scan'
+                  : 'Hold still — Excessive head movement detected';
+                if (motionWarningRef.current !== warnMsg) {
+                  motionWarningRef.current = warnMsg;
+                  setMotionWarning(warnMsg);
+                }
+              } else if (nowMs > motionHoldUntilRef.current && motionWarningRef.current !== null) {
+                motionWarningRef.current = null;
+                setMotionWarning(null);
+              }
+            }
+
+            prevMotionSampleRef.current = {
+              time: nowMs,
+              eyeDist,
+              pts: trackedPts,
+              mouthGapRatio,
+            };
           } else {
             latestFaceLandmarksRef.current = null;
+            prevMotionSampleRef.current = null;
+            mouthActivityWindowRef.current = [];
+            if (motionWarningRef.current !== null) {
+              motionWarningRef.current = null;
+              setMotionWarning(null);
+            }
             if (isFaceDetectedRef.current) {
               isFaceDetectedRef.current = false;
               setIsFaceDetected(false);
@@ -636,9 +717,17 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
     isFaceDetectedRef.current = true;
     isFaceAlignedRef.current = true;
     faceAlignmentWarningRef.current = null;
+    lightingWarningRef.current = null;
+    motionWarningRef.current = null;
+    badLightingFramesRef.current = 0;
+    prevMotionSampleRef.current = null;
+    mouthActivityWindowRef.current = [];
+    motionHoldUntilRef.current = 0;
     latestFaceLandmarksRef.current = null;
     setIsFaceDetected(true);
     setFaceAlignmentWarning(null);
+    setLightingWarning(null);
+    setMotionWarning(null);
   };
 
   // Step 4 Scanning and vPPG Extraction Loop
@@ -646,8 +735,14 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
     if (scanTimerRef.current) clearInterval(scanTimerRef.current);
 
     scanTimerRef.current = window.setInterval(() => {
-      // 1. AUTO-PAUSE: If no face detected or face is not fully centered, pause timer immediately!
-      if (!isSimulated && (!isFaceDetectedRef.current || !isFaceAlignedRef.current)) {
+      // 1. AUTO-PAUSE: Pause timer on missing/unaligned face, poor lighting/glare, or unstable head motion
+      if (
+        !isSimulated &&
+        (!isFaceDetectedRef.current ||
+          !isFaceAlignedRef.current ||
+          !!lightingWarningRef.current ||
+          !!motionWarningRef.current)
+      ) {
         return;
       }
 
@@ -658,7 +753,7 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
         if (next < 8) {
           setScanStatusMessage('Scanning Vitals... Locking facial capillary ROI');
         } else if (next < 20) {
-          setScanStatusMessage('Scanning Vitals... Sampling optical green channel vPPG');
+          setScanStatusMessage('Scanning Vitals... Extracting POS RGB vascular signal (0.75–3.0 Hz)');
         } else if (next < 35) {
           setScanStatusMessage('Scanning Vitals... Analyzing inter-beat intervals (IBI)');
         } else if (next < 50) {
@@ -704,8 +799,13 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
             // Realistic photoplethysmogram wave with dicrotic notch
             const pulseValue = Math.sin(angle) * 0.72 + Math.sin(angle * 2) * 0.22 - 0.08 * Math.cos(angle * 3);
 
-            processorRef.current.addFrame(132 + pulseValue * 14, 122 + pulseValue * 8, 108, now);
-            wavePointsRef.current.push(pulseValue);
+            const filteredWave = processorRef.current.addFrame(
+              135 + pulseValue * 4.5,
+              182 + pulseValue * 1.1,
+              114 + pulseValue * 1.6,
+              now
+            );
+            wavePointsRef.current.push(filteredWave || pulseValue);
             if (wavePointsRef.current.length > 90) {
               wavePointsRef.current.shift();
             }
@@ -791,48 +891,133 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
           return;
         }
 
-        // Biometric Face ROI tracking (forehead and cheeks region)
-        let faceX = cw * 0.35;
-        let faceY = ch * 0.22;
-        let faceW = cw * 0.30;
-        let faceH = ch * 0.35;
+        // Multi-ROI Skin Extraction: Forehead + Left Cheek + Right Cheek crops for POS RGB processing
+        const rois: Array<{ x: number; y: number; w: number; h: number }> = [];
 
         if (latestFaceLandmarksRef.current && latestFaceLandmarksRef.current.length >= 468) {
           const lm = latestFaceLandmarksRef.current;
-          // Landmark 10 is forehead center
-          const fx = isFrontCamera ? (1 - lm[10].x) * cw : lm[10].x * cw;
-          const fy = lm[10].y * ch;
-          faceX = Math.max(0, Math.min(cw - 60, fx - cw * 0.15));
-          faceY = Math.max(0, Math.min(ch - 60, fy));
-          faceW = Math.min(cw - faceX, cw * 0.30);
-          faceH = Math.min(ch - faceY, ch * 0.25);
+          const mapX = (nx: number) => (isFrontCamera ? (1 - nx) * cw : nx * cw);
+          const mapY = (ny: number) => ny * ch;
+
+          // Forehead ROI around landmark 10
+          const fhX = mapX(lm[10].x);
+          const fhY = mapY(lm[10].y);
+          const fhW = Math.max(24, cw * 0.14);
+          const fhH = Math.max(16, ch * 0.07);
+          rois.push({
+            x: Math.max(0, Math.min(cw - fhW, fhX - fhW / 2)),
+            y: Math.max(0, Math.min(ch - fhH, fhY + 4)),
+            w: fhW,
+            h: fhH,
+          });
+
+          // Left Cheek ROI (mid-cheek landmark 50 / 118) & Right Cheek ROI (landmark 280 / 347)
+          const cheekPts = [lm[50] || lm[234], lm[280] || lm[454]];
+          const ckW = Math.max(20, cw * 0.08);
+          const ckH = Math.max(18, ch * 0.07);
+          cheekPts.forEach((pt) => {
+            if (pt) {
+              const cxPt = mapX(pt.x);
+              const cyPt = mapY(pt.y);
+              rois.push({
+                x: Math.max(0, Math.min(cw - ckW, cxPt - ckW / 2)),
+                y: Math.max(0, Math.min(ch - ckH, cyPt - ckH / 2)),
+                w: ckW,
+                h: ckH,
+              });
+            }
+          });
+        } else {
+          // Proportional fallback Forehead + Left/Right Cheek ROIs inside centered face ellipse
+          rois.push(
+            { x: cw * 0.41, y: ch * 0.22, w: cw * 0.18, h: ch * 0.09 },
+            { x: cw * 0.34, y: ch * 0.44, w: cw * 0.09, h: ch * 0.09 },
+            { x: cw * 0.57, y: ch * 0.44, w: cw * 0.09, h: ch * 0.09 }
+          );
         }
 
-        // Sample optical pixel data from forehead & upper cheeks
+        // Sample mean R, G, B values across all skin ROI crops + Forehead Luminance & Glare Check
         try {
-          const imgData = ctx.getImageData(faceX, faceY, faceW, faceH);
-          const pixels = imgData.data;
           let rSum = 0;
           let gSum = 0;
           let bSum = 0;
-          const totalPixels = pixels.length / 4;
+          let sampleCount = 0;
 
-          for (let i = 0; i < pixels.length; i += 16) {
-            rSum += pixels[i];
-            gSum += pixels[i + 1];
-            bSum += pixels[i + 2];
+          let fhLumSum = 0;
+          let fhGlarePixels = 0;
+          let fhSampleCount = 0;
+
+          for (let rIdx = 0; rIdx < rois.length; rIdx++) {
+            const roi = rois[rIdx];
+            const rx = Math.floor(roi.x);
+            const ry = Math.floor(roi.y);
+            const rw = Math.floor(Math.min(roi.w, cw - rx));
+            const rh = Math.floor(Math.min(roi.h, ch - ry));
+            if (rw <= 2 || rh <= 2) continue;
+
+            const imgData = ctx.getImageData(rx, ry, rw, rh);
+            const pixels = imgData.data;
+            for (let i = 0; i < pixels.length; i += 8) {
+              const r = pixels[i];
+              const g = pixels[i + 1];
+              const b = pixels[i + 2];
+              rSum += r;
+              gSum += g;
+              bSum += b;
+              sampleCount++;
+
+              // Forehead ROI (index 0) luminance & glare telemetry
+              if (rIdx === 0) {
+                const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+                fhLumSum += lum;
+                if (r > 246 && g > 246 && b > 246) {
+                  fhGlarePixels++;
+                }
+                fhSampleCount++;
+              }
+            }
           }
 
-          const sampleCount = totalPixels / 4;
-          const rMean = rSum / sampleCount;
-          const gMean = gSum / sampleCount;
-          const bMean = bSum / sampleCount;
+          // 1. Brightness & Glare Guardrail (Forehead ROI mean luminance)
+          if (fhSampleCount > 0) {
+            const meanForeheadLum = fhLumSum / fhSampleCount;
+            const glareRatio = fhGlarePixels / fhSampleCount;
 
-          // Feed into genuine vPPG processor
-          const pulseValue = processorRef.current.addFrame(gMean, rMean, bMean, performance.now());
+            let detectedLightIssue: string | null = null;
+            if (meanForeheadLum < 52) {
+              detectedLightIssue = 'Improve lighting';
+            } else if (meanForeheadLum > 224 || glareRatio > 0.25) {
+              detectedLightIssue = 'Reduce glare';
+            }
 
-          // Append to live waveform graph
-          wavePointsRef.current.push(pulseValue);
+            if (detectedLightIssue) {
+              badLightingFramesRef.current = Math.min(10, badLightingFramesRef.current + 1);
+              if (badLightingFramesRef.current >= 4 && lightingWarningRef.current !== detectedLightIssue) {
+                lightingWarningRef.current = detectedLightIssue;
+                setLightingWarning(detectedLightIssue);
+              }
+            } else {
+              badLightingFramesRef.current = 0;
+              if (lightingWarningRef.current !== null && meanForeheadLum >= 58 && meanForeheadLum <= 218) {
+                lightingWarningRef.current = null;
+                setLightingWarning(null);
+              }
+            }
+          }
+
+          // 2. Discard unstable frames if lighting/glare warning or head/talking motion is active
+          const isEnvironmentUnstable = !!lightingWarningRef.current || !!motionWarningRef.current;
+          if (sampleCount > 0 && !isEnvironmentUnstable) {
+            const rMean = rSum / sampleCount;
+            const gMean = gSum / sampleCount;
+            const bMean = bSum / sampleCount;
+
+            // Feed stable mean RGB into POS + 0.75-3.0 Hz Butterworth bandpass processor
+            const pulseValue = processorRef.current.addFrame(gMean, rMean, bMean, performance.now());
+
+            // Append to live waveform graph
+            wavePointsRef.current.push(pulseValue);
+          }
           if (wavePointsRef.current.length > 90) {
             wavePointsRef.current.shift();
           }
@@ -1765,26 +1950,46 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
                   className="w-full h-full object-cover"
                 />
 
-                {/* AUTO-PAUSE & ALERTS: Clear overlay notice when no face detected or face is not centered/full */}
-                {(!isFaceDetected || !!faceAlignmentWarning) && !isSimulatedScan && (
-                  <div className="absolute inset-0 bg-black/80 backdrop-blur-xs flex flex-col items-center justify-center p-4 z-20 text-center animate-in fade-in duration-200">
+                {/* AUTO-PAUSE & GUARDRAIL ALERTS: Face alignment, brightness/glare, and head motion/talking */}
+                {(!isFaceDetected || !!faceAlignmentWarning || !!lightingWarning || !!motionWarning) && !isSimulatedScan && (
+                  <div
+                    className={`absolute inset-0 ${
+                      !isFaceDetected || !!faceAlignmentWarning ? 'bg-black/75' : 'bg-black/45'
+                    } backdrop-blur-xs flex flex-col items-center justify-center p-4 z-20 text-center animate-in fade-in duration-200`}
+                  >
                     <div className="w-16 h-16 rounded-full bg-red-500/20 border-2 border-red-500 flex items-center justify-center text-red-400 mb-3 animate-pulse shadow-lg shadow-red-500/30">
                       <AlertTriangle className="w-8 h-8 text-red-400" />
                     </div>
                     <div className="bg-slate-950/90 border border-amber-500/60 rounded-2xl px-5 py-3.5 max-w-xs shadow-2xl">
                       <h5 className="text-white font-bold text-sm tracking-wide">
-                        {faceAlignmentWarning || 'Face not aligned — Scanning Paused'}
+                        {!isFaceDetected || faceAlignmentWarning
+                          ? faceAlignmentWarning || 'Face not aligned — Scanning Paused'
+                          : lightingWarning
+                          ? `${lightingWarning} — Scanning Paused`
+                          : `${motionWarning} — Scanning Paused`}
                       </h5>
                       <p className="text-amber-200/90 text-xs mt-1.5 font-medium leading-relaxed">
-                        {faceAlignmentWarning?.includes('Move Closer')
-                          ? 'Please move slightly closer to fill the biometric guide'
-                          : faceAlignmentWarning?.includes('No Face')
-                          ? 'Position your face in front of the camera lens'
-                          : 'Re-align your full face inside the central circle guide to resume scanning'}
+                        {!isFaceDetected || faceAlignmentWarning
+                          ? faceAlignmentWarning?.includes('Move Closer')
+                            ? 'Please move slightly closer to fill the biometric guide'
+                            : faceAlignmentWarning?.includes('No Face')
+                            ? 'Position your face in front of the camera lens'
+                            : 'Re-align your full face inside the central circle guide to resume scanning'
+                          : lightingWarning === 'Improve lighting'
+                          ? 'Your forehead area is too dark. Move to a well-lit area or face a light source.'
+                          : lightingWarning === 'Reduce glare'
+                          ? 'Direct bright glare detected on your forehead. Angle away from harsh light.'
+                          : 'Unstable frames are being discarded. Hold your head steady and avoid talking.'}
                       </p>
                       <div className="mt-2.5 text-[10px] text-amber-300 font-mono bg-amber-950/70 px-2.5 py-1 rounded-full inline-flex items-center gap-1.5 border border-amber-500/30">
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
-                        <span>Auto-resumes on central re-alignment</span>
+                        <span>
+                          {!isFaceDetected || faceAlignmentWarning
+                            ? 'Auto-resumes on central re-alignment'
+                            : lightingWarning
+                            ? 'Auto-resumes when lighting stabilizes'
+                            : 'Auto-resumes when you hold still'}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -1793,15 +1998,33 @@ export const VitalLensModal: React.FC<VitalLensModalProps> = ({
                 {/* Top overlay: Live Pulse, Wake Lock Status & Timer */}
                 <div className="absolute top-3 inset-x-3 flex items-center justify-between z-10 pointer-events-none">
                   <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md border border-purple-500/40 text-xs font-black text-white">
-                    <Heart className={`w-3.5 h-3.5 ${isFaceDetected && !faceAlignmentWarning ? 'text-rose-500 animate-ping' : 'text-slate-400'}`} />
-                    <span>{isFaceDetected && !faceAlignmentWarning ? `${liveBpm} BPM` : 'Paused'}</span>
+                    <Heart
+                      className={`w-3.5 h-3.5 ${
+                        isFaceDetected && !faceAlignmentWarning && !lightingWarning && !motionWarning
+                          ? 'text-rose-500 animate-ping'
+                          : 'text-slate-400'
+                      }`}
+                    />
+                    <span>
+                      {isFaceDetected && !faceAlignmentWarning && !lightingWarning && !motionWarning
+                        ? `${liveBpm} BPM`
+                        : 'Paused'}
+                    </span>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {(!isFaceDetected || !!faceAlignmentWarning) && !isSimulatedScan && (
+                    {(!isFaceDetected || !!faceAlignmentWarning || !!lightingWarning || !!motionWarning) && !isSimulatedScan && (
                       <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-950/80 backdrop-blur-md border border-red-500/50 text-[10px] font-bold text-red-300">
                         <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
-                        <span>{faceAlignmentWarning ? 'Uncentered' : 'No Face'}</span>
+                        <span>
+                          {!isFaceDetected
+                            ? 'No Face'
+                            : faceAlignmentWarning
+                            ? 'Uncentered'
+                            : lightingWarning
+                            ? lightingWarning
+                            : 'Hold Still'}
+                        </span>
                       </div>
                     )}
                     {isWakeLockActive && (
